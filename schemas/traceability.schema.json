@@ -1,0 +1,151 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "TFL to SAP traceability records",
+  "oneOf": [
+    { "$ref": "#/$defs/component" },
+    { "$ref": "#/$defs/mapping" },
+    { "$ref": "#/$defs/review" },
+    { "$ref": "#/$defs/referenceAnnotation" }
+  ],
+  "$defs": {
+    "text": { "type": "string", "minLength": 1, "pattern": "\\S" },
+    "nullableText": { "anyOf": [{ "$ref": "#/$defs/text" }, { "type": "null" }] },
+    "textList": { "type": "array", "items": { "$ref": "#/$defs/text" }, "uniqueItems": true },
+    "status": { "enum": ["supported", "partially_supported", "not_found_in_supplied_sap", "needs_review"] },
+    "context": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["population", "endpoint", "visit", "treatment_groups", "surrounding_labels"],
+      "properties": {
+        "population": { "$ref": "#/$defs/nullableText" },
+        "endpoint": { "$ref": "#/$defs/nullableText" },
+        "visit": { "$ref": "#/$defs/nullableText" },
+        "treatment_groups": { "$ref": "#/$defs/textList" },
+        "surrounding_labels": { "$ref": "#/$defs/textList" }
+      }
+    },
+    "component": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["record_type", "component_id", "family_id", "shell_id", "shell_version", "locator", "kind", "label", "context"],
+      "properties": {
+        "record_type": { "const": "component" },
+        "component_id": { "$ref": "#/$defs/text" },
+        "family_id": { "$ref": "#/$defs/text" },
+        "shell_id": { "$ref": "#/$defs/text" },
+        "shell_version": { "$ref": "#/$defs/text" },
+        "locator": { "$ref": "#/$defs/text" },
+        "kind": { "enum": ["title", "population_label", "table_row", "table_column", "figure_axis", "figure_legend", "figure_error_bar", "listing_column", "listing_selection_note", "footnote"] },
+        "label": { "$ref": "#/$defs/text" },
+        "context": { "$ref": "#/$defs/context" }
+      }
+    },
+    "passage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["passage_id", "section", "page", "quote"],
+      "properties": {
+        "passage_id": { "$ref": "#/$defs/text" },
+        "section": { "$ref": "#/$defs/text" },
+        "page": { "type": "integer", "minimum": 1 },
+        "quote": { "$ref": "#/$defs/text" },
+        "text_span": {
+          "description": "Optional full reference passage in the whitespace-normalized text of the cited page. Zero-based Unicode character offsets, end exclusive.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["start", "end"],
+          "properties": {
+            "start": { "type": "integer", "minimum": 0 },
+            "end": { "type": "integer", "minimum": 1 }
+          }
+        }
+      }
+    },
+    "assessment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "rationale", "evidence", "convention_ids", "open_questions"],
+      "properties": {
+        "status": { "$ref": "#/$defs/status" },
+        "rationale": { "$ref": "#/$defs/text" },
+        "evidence": { "type": "array", "items": { "$ref": "#/$defs/passage" }, "uniqueItems": true },
+        "convention_ids": { "$ref": "#/$defs/textList" },
+        "open_questions": { "$ref": "#/$defs/textList" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "status": { "enum": ["supported", "partially_supported"] } } },
+          "then": { "properties": { "evidence": { "minItems": 1 } } }
+        },
+        {
+          "if": { "properties": { "status": { "const": "not_found_in_supplied_sap" } } },
+          "then": { "properties": { "evidence": { "maxItems": 0 } } }
+        },
+        {
+          "if": { "properties": { "status": { "enum": ["partially_supported", "needs_review"] } } },
+          "then": { "properties": { "open_questions": { "minItems": 1 } } }
+        }
+      ]
+    },
+    "mapping": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["record_type", "mapping_id", "component_id", "sap_id", "sap_version", "assessment"],
+      "properties": {
+        "record_type": { "const": "mapping" },
+        "mapping_id": { "$ref": "#/$defs/text" },
+        "component_id": { "$ref": "#/$defs/text" },
+        "sap_id": { "$ref": "#/$defs/text" },
+        "sap_version": { "$ref": "#/$defs/text" },
+        "assessment": { "$ref": "#/$defs/assessment" }
+      }
+    },
+    "review": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["record_type", "component_id", "mapping_id", "action"],
+      "properties": {
+        "record_type": { "const": "review" },
+        "component_id": { "$ref": "#/$defs/text" },
+        "mapping_id": { "$ref": "#/$defs/text" },
+        "action": { "enum": ["pending", "accept", "correct", "reject"] },
+        "corrected_assessment": { "$ref": "#/$defs/assessment" },
+        "note": { "$ref": "#/$defs/text" }
+      },
+      "if": { "properties": { "action": { "const": "correct" } } },
+      "then": { "required": ["corrected_assessment"] },
+      "else": { "not": { "required": ["corrected_assessment"] } }
+    },
+    "evidenceGroup": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["claim", "alternatives"],
+      "properties": {
+        "claim": { "$ref": "#/$defs/text" },
+        "alternatives": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/textList", "minItems": 1 },
+          "minItems": 1,
+          "uniqueItems": true
+        }
+      }
+    },
+    "referenceAnnotation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["record_type", "component_id", "sap_id", "sap_version", "assessment", "evidence_groups", "review_state"],
+      "properties": {
+        "record_type": { "const": "reference_annotation" },
+        "component_id": { "$ref": "#/$defs/text" },
+        "sap_id": { "$ref": "#/$defs/text" },
+        "sap_version": { "$ref": "#/$defs/text" },
+        "assessment": { "$ref": "#/$defs/assessment" },
+        "evidence_groups": { "type": "array", "items": { "$ref": "#/$defs/evidenceGroup" } },
+        "review_state": { "enum": ["draft", "reviewed"] },
+        "review_note": { "$ref": "#/$defs/text" }
+      },
+      "if": { "properties": { "review_state": { "const": "reviewed" } } },
+      "then": { "required": ["review_note"] }
+    }
+  }
+}

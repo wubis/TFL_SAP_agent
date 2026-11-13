@@ -17,6 +17,8 @@
         "date": "2018-12-18",
         "url": "https://cdn.clinicaltrials.gov/large-docs/34/NCT03469934/SAP_001.pdf",
         "locator": "SAP pp. 1–46 in the statistical methods bundle, CSR printed pp. 2–47",
+        "pdf_pages": [2, 47],
+        "source_pdf_sha256": "0dfc31f22dad9c64829118566628b9c130a08590a776380a30b60e020900d493",
         "redistribution": "unverified"
       },
       "shells": [
@@ -30,6 +32,7 @@
           "linked_sap_id": "NCT03469934-SAP-v1.0",
           "url": "https://cdn.clinicaltrials.gov/large-docs/34/NCT03469934/SAP_001.pdf",
           "locator": "Table Shells p. 23, CSR printed p. 71, Table 14.2.1.1",
+          "pdf_pages": [71, 71],
           "redistribution": "unverified"
         },
         {
@@ -42,6 +45,7 @@
           "linked_sap_id": "NCT03469934-SAP-v1.0",
           "url": "https://cdn.clinicaltrials.gov/large-docs/34/NCT03469934/SAP_001.pdf",
           "locator": "Figure Shells p. 13, CSR printed p. 155, mean profile Figure 14.4.2.1",
+          "pdf_pages": [155, 155],
           "redistribution": "unverified",
           "notes": "Illustrative plot. The shell explicitly leaves final axes and time points to be adapted. The figure number is also used for a waterfall plot on another page, so use the page and title together."
         },
@@ -55,6 +59,7 @@
           "linked_sap_id": "NCT03469934-SAP-v1.0",
           "url": "https://cdn.clinicaltrials.gov/large-docs/34/NCT03469934/SAP_001.pdf",
           "locator": "Listing Shells p. 24, CSR printed p. 124, Listing 16.2.6.2",
+          "pdf_pages": [124, 124],
           "redistribution": "unverified"
         }
       ],

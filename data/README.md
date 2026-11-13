@@ -8,7 +8,9 @@ The first pass records six candidate trial families. Two have verified SAP-to-sh
 
 Start with **NCT03469934 (ANB020-004)**. It has a continuous FEV1 summary table, a mean eosinophil profile figure, and a subject-level spirometry listing. The PDF's front page ties the three shell documents to the same SAP date. The table and listing share an endpoint, while the figure exercises a different analysis population. The manifest records both section-local and printed CSR page numbers because numbering restarts in each section. [ClinicalTrials.gov statistical methods bundle](https://cdn.clinicaltrials.gov/large-docs/34/NCT03469934/SAP_001.pdf)
 
-For any bundle that contains both SAP text and shell pages, put the selected shell pages on the input side and restrict the evidence collection to the selected SAP text. This prevents the agent from citing the shell itself as evidence. Preserve the original page numbering in the provenance record. The manifest links to the public copies and records the known redistribution status. The initial verification used indexed PDF text because the workspace could not download the calibration PDF. Check the figure artwork against the original PDF during intake.
+The calibration manifest also includes the original PDF's SHA-256 checksum and inclusive, one-based `pdf_pages` ranges for intake.
+
+For any bundle that contains both SAP text and shell pages, put the selected shell pages on the input side and restrict the evidence collection to the selected SAP text. This prevents the agent from citing the shell itself as evidence. Preserve the original page numbering in the provenance record. The manifest links to the public copies and records the known redistribution status. The original calibration PDF was checked during [Step 2](../benchmark/README.md). The figure includes illustrative points, with final axes and time points left to the actual study data.
 
 ## Finish the collection
 

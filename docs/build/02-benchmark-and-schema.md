@@ -4,6 +4,8 @@
 
 **Input** — The source manifest, calibration family, and frozen family split.
 
+**Working files** — [Traceability record schema](../../schemas/traceability.schema.json) · [Annotation guide](../../benchmark/annotation-guide.md) · [Calibration records](../../benchmark/README.md)
+
 ## What to build
 
 1. Write a shared schema for **components**, **mappings**, and **review decisions**. A component has a stable ID, shell ID and version, locator, type, label, and analysis context. A mapping has the component ID, SAP ID and version, zero or more evidence passages with exact quotations, section and page, support status, rationale, convention flag, and unresolved questions. A review decision has the component ID, action, and any corrected evidence, status, or rationale.
