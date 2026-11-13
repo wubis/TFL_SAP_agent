@@ -1,4 +1,4 @@
-"""Validate the calibration records and optionally check evidence against the source PDF."""
+"""Validate a development family's annotations and optionally check citations against its PDF."""
 
 import argparse
 import hashlib
@@ -52,20 +52,23 @@ def check_pdf(pdf, sap, passages):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--pdf", type=Path, help="Original calibration PDF for citation checks with Ghostscript")
+    parser.add_argument("--family", help="Development family ID, defaults to the calibration family")
+    parser.add_argument("--pdf", type=Path, help="Original family SAP PDF for citation checks with Ghostscript")
     args = parser.parse_args()
 
     schema = json.loads((ROOT / "schemas/traceability.schema.json").read_text(encoding="utf-8"))
     Draft202012Validator.check_schema(schema)
     validator = Draft202012Validator(schema)
     manifest = json.loads((ROOT / "data/source-manifest.json").read_text(encoding="utf-8"))
-    family_id = manifest["calibration_family_id"]
-    family, = [item for item in manifest["families"] if item["family_id"] == family_id]
-    if family["proposed_partition"] != "development" or family["source_status"] != "verified_pair":
-        raise ValueError("Calibration requires a verified development family")
+    family_id = args.family or manifest["calibration_family_id"]
+    family = next((item for item in manifest["families"] if item["family_id"] == family_id), None)
+    if family is None or family["partition"] != "development" or family["source_status"] != "verified_pair":
+        parser.error("Select a verified development family")
     sap = family["sap"]
-    sap_first, sap_last = sap["pdf_pages"]
-    sap_page_count = sap_last - sap_first + 1
+    pdf_pages = sap.get("pdf_pages")
+    sap_page_count = pdf_pages[1] - pdf_pages[0] + 1 if pdf_pages else None
+    if args.pdf and (not pdf_pages or not sap.get("source_pdf_sha256")):
+        parser.error("PDF checks require page bounds and a checksum in the manifest")
     shells = {shell["document_id"]: shell for shell in family["shells"]}
     folder = ROOT / "benchmark" / "development" / family_id
     components = read_jsonl(folder / "components.jsonl", "component", validator)
@@ -92,7 +95,7 @@ def main():
             raise ValueError(f"{component_id}: duplicate evidence IDs or inconsistent evidence groups")
         for passage in evidence:
             pid = passage["passage_id"]
-            if not 1 <= passage["page"] <= sap_page_count:
+            if sap_page_count is not None and passage["page"] > sap_page_count:
                 raise ValueError(f"{pid}: page outside the selected SAP")
             span = passage.get("text_span")
             if span and span["start"] >= span["end"]:

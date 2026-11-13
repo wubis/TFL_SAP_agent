@@ -2,7 +2,18 @@
 
 [Step 1 build guide](../docs/build/01-source-collection.md) · [Source manifest](source-manifest.json)
 
-The first pass records six candidate trial families. Two have verified SAP-to-shell pairings, one has an authentic table with a version pairing still to confirm, one has a linked supplement whose contents need inspection, and two currently have a SAP only. The proposed split is three development families and three held-out families. Freeze it once the selected families and shell coverage are confirmed.
+The six-family split was frozen on November 13, 2026. Each family has a public SAP and at least one authentic unpopulated shell. Both partitions cover tables, figures, and listings. The manifest retains inTandem3 and DEVOTE as reserve sources because their authentic shells have yet to be verified. APRIL and TAPS-2 replaced them in the selected corpus.
+
+| Partition | Trial family | Selected shells |
+| --- | --- | --- |
+| Development | ANB020-004 (`NCT03469934`) | FEV1 table, mean eosinophil profile, spirometry listing |
+| Development | TARVA (`NCT02128555`) | Table S4, MOXFQ outcomes at 26 and 52 weeks |
+| Development | APRIL (`ISRCTN12368131`) | Appendix Table 3, continuous patient-reported outcomes |
+| Held out | MARCH-PFIC (`NCT03905330`) | Serum bile acid table and subject-level listing |
+| Held out | E-SEE (`ISRCTN11079129`) | ASQ:SE-2 summary table and mean profile figure |
+| Held out | TAPS-2 (`NCT03975894`) | Table 4, birthweight row and supporting headers |
+
+MARCH-PFIC's paired SAP version is inferred from the shared protocol amendment, project code, bundle, and matching planned outputs. The two shell documents have their own version dates. [MARCH-PFIC SAP and shells](https://cdn.clinicaltrials.gov/large-docs/30/NCT03905330/SAP_001.pdf)
 
 ## Calibration family
 
@@ -12,9 +23,6 @@ The calibration manifest also includes the original PDF's SHA-256 checksum and i
 
 For any bundle that contains both SAP text and shell pages, put the selected shell pages on the input side and restrict the evidence collection to the selected SAP text. This prevents the agent from citing the shell itself as evidence. Preserve the original page numbering in the provenance record. The manifest links to the public copies and records the known redistribution status. The original calibration PDF was checked during [Step 2](../benchmark/README.md). The figure includes illustrative points, with final axes and time points left to the actual study data.
 
-## Finish the collection
+## Annotation handoff
 
-1. Confirm the exact version pairing for the MARCH-PFIC table and inspect the actual subject-level listing. The listing is indexed in the public bundle. [MARCH-PFIC SAP and shells](https://cdn.clinicaltrials.gov/large-docs/30/NCT03905330/SAP_001.pdf)
-2. Open TARVA Additional file 1 and select a continuous-outcome table. Check for authentic shells for inTandem3 and DEVOTE. If authentic coverage is insufficient, record the TA's agreed mix and build clearly labeled, unpopulated fixtures against the identified SAPs. [TARVA published SAP and supplement](https://link.springer.com/article/10.1186/s13063-019-3973-4)
-3. Confirm that the held-out families cover tables, figures, and listings. E-SEE provides the first two. A verified listing layout is the main gap. [E-SEE SAP and Appendix A](https://www.york.ac.uk/media/healthsciences/documents/research/public-health/e-see/1_Statistical%20Analysis%20Plan%20%28main%20trial%29.pdf)
-4. Record the team's owners for acquisition, annotation, implementation, and evaluation, plus the TA's decisions on shell mix, annotation review, and demo format. Freeze the final split by family before agent development.
+Begin the independent calibration review and assign annotators for the other families. The authentic source set is ready. Team ownership, annotation review requirements, and demo format still need to be recorded. Challenge variants may be added to a selected family in its existing partition, with their construction recorded in the manifest.

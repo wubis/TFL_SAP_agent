@@ -1,15 +1,17 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "reviewed_on": "2026-11-13",
-  "partition_status": "draft",
+  "partition_status": "frozen",
   "calibration_family_id": "NCT03469934",
   "families": [
     {
       "family_id": "NCT03469934",
       "protocol_id": "ANB020-004",
       "study_name": "ANB020 in severe eosinophilic asthma",
-      "arms": ["ANB020", "Placebo"],
-      "proposed_partition": "development",
+      "arms": [
+        "ANB020",
+        "Placebo"
+      ],
       "source_status": "verified_pair",
       "sap": {
         "document_id": "NCT03469934-SAP-v1.0",
@@ -17,7 +19,10 @@
         "date": "2018-12-18",
         "url": "https://cdn.clinicaltrials.gov/large-docs/34/NCT03469934/SAP_001.pdf",
         "locator": "SAP pp. 1–46 in the statistical methods bundle, CSR printed pp. 2–47",
-        "pdf_pages": [2, 47],
+        "pdf_pages": [
+          2,
+          47
+        ],
         "source_pdf_sha256": "0dfc31f22dad9c64829118566628b9c130a08590a776380a30b60e020900d493",
         "redistribution": "unverified"
       },
@@ -32,7 +37,10 @@
           "linked_sap_id": "NCT03469934-SAP-v1.0",
           "url": "https://cdn.clinicaltrials.gov/large-docs/34/NCT03469934/SAP_001.pdf",
           "locator": "Table Shells p. 23, CSR printed p. 71, Table 14.2.1.1",
-          "pdf_pages": [71, 71],
+          "pdf_pages": [
+            71,
+            71
+          ],
           "redistribution": "unverified"
         },
         {
@@ -45,7 +53,10 @@
           "linked_sap_id": "NCT03469934-SAP-v1.0",
           "url": "https://cdn.clinicaltrials.gov/large-docs/34/NCT03469934/SAP_001.pdf",
           "locator": "Figure Shells p. 13, CSR printed p. 155, mean profile Figure 14.4.2.1",
-          "pdf_pages": [155, 155],
+          "pdf_pages": [
+            155,
+            155
+          ],
           "redistribution": "unverified",
           "notes": "Illustrative plot. The shell explicitly leaves final axes and time points to be adapted. The figure number is also used for a waterfall plot on another page, so use the page and title together."
         },
@@ -59,26 +70,116 @@
           "linked_sap_id": "NCT03469934-SAP-v1.0",
           "url": "https://cdn.clinicaltrials.gov/large-docs/34/NCT03469934/SAP_001.pdf",
           "locator": "Listing Shells p. 24, CSR printed p. 124, Listing 16.2.6.2",
-          "pdf_pages": [124, 124],
+          "pdf_pages": [
+            124,
+            124
+          ],
           "redistribution": "unverified"
         }
       ],
-      "notes": "The bundle inventory lists the SAP and all three shell documents together, dated 18 December 2018. The later ACQ-5 file note is outside the selected SAP evidence."
+      "notes": "The bundle inventory lists the SAP and all three shell documents together, dated 18 December 2018. The later ACQ-5 file note is outside the selected SAP evidence.",
+      "partition": "development"
+    },
+    {
+      "family_id": "NCT02128555",
+      "protocol_id": "ISRCTN60672307",
+      "study_name": "TARVA",
+      "arms": [
+        "Total ankle replacement",
+        "Ankle arthrodesis"
+      ],
+      "source_status": "verified_pair",
+      "sap": {
+        "document_id": "NCT02128555-SAP-TRIALS-2020",
+        "version": "Published SAP (DOI 10.1186/s13063-019-3973-4)",
+        "date": "2020-02-18",
+        "url": "https://link.springer.com/article/10.1186/s13063-019-3973-4",
+        "locator": "Statistical analyses and Supplementary information",
+        "redistribution": "CC BY 4.0 (published article)"
+      },
+      "shells": [
+        {
+          "document_id": "NCT02128555-TABLE-S4",
+          "type": "table",
+          "label": "Continuous clinical outcome summaries at Weeks 26 and 52",
+          "authenticity": "authentic",
+          "version": "Additional file 1 (version of record)",
+          "date": "2020-02-18",
+          "linked_sap_id": "NCT02128555-SAP-TRIALS-2020",
+          "url": "https://media.springernature.com/original/springer-static/esm/art%3A10.1186%2Fs13063-019-3973-4/MediaObjects/13063_2019_3973_MOESM1_ESM.docx",
+          "locator": "Additional file 1, Table S4. Use the MOXFQ walking/standing rows and associated headers.",
+          "redistribution": "unverified",
+          "source_sha256": "c33650b568373bd517ba5b4fa68227b789f2a20e2da8500885389d8e5be383b1"
+        }
+      ],
+      "notes": "The version of record explicitly identifies Additional file 1 as its dummy tables. The supplement shows blank arm-by-visit mean and SD cells.",
+      "partition": "development"
+    },
+    {
+      "family_id": "ISRCTN12368131",
+      "protocol_id": "APRIL protocol v4.1",
+      "study_name": "APRIL",
+      "arms": [
+        "Ashwagandha",
+        "Placebo"
+      ],
+      "sap": {
+        "document_id": "ISRCTN12368131-SAP-v1.0",
+        "version": "1.0",
+        "date": "2025-07-21",
+        "url": "https://www.isrctn.com/editorial/retrieveFile/f9e43ab8-60c8-4eb7-875d-3afe157430ed/42176",
+        "locator": "Main SAP pp. 1–11, before the dummy table appendix",
+        "pdf_pages": [
+          1,
+          11
+        ],
+        "source_pdf_sha256": "d2387a64c2d8d4957061e7d1438f59bf21fd84616e5af9057980989c35958537",
+        "redistribution": "unverified"
+      },
+      "shells": [
+        {
+          "document_id": "ISRCTN12368131-TABLE-APP3",
+          "type": "table",
+          "label": "Three-month continuous patient-reported outcomes",
+          "authenticity": "authentic",
+          "version": "1.0",
+          "date": "2025-07-21",
+          "linked_sap_id": "ISRCTN12368131-SAP-v1.0",
+          "url": "https://www.isrctn.com/editorial/retrieveFile/f9e43ab8-60c8-4eb7-875d-3afe157430ed/42176",
+          "locator": "Appendix Table 3, p. 13, key secondary outcome rows and associated columns",
+          "redistribution": "unverified",
+          "pdf_pages": [
+            13,
+            13
+          ],
+          "notes": "Use the continuous PROMIS 29+2 and EQ-VAS summaries. The ordinal primary outcome rows are outside the selected scope."
+        }
+      ],
+      "notes": "The dummy table is embedded in the final signed SAP. The date is the last of the final approvals on the cover.",
+      "partition": "development",
+      "source_status": "verified_pair"
     },
     {
       "family_id": "NCT03905330",
       "protocol_id": "MRX-502",
       "study_name": "MARCH-PFIC",
-      "arms": ["Maralixibat", "Placebo"],
-      "proposed_partition": "held_out",
-      "source_status": "pair_to_confirm",
+      "arms": [
+        "Maralixibat",
+        "Placebo"
+      ],
+      "source_status": "verified_pair",
       "sap": {
         "document_id": "NCT03905330-SAP-v2.0",
         "version": "Final 2.0",
         "date": "2022-09-29",
         "url": "https://cdn.clinicaltrials.gov/large-docs/30/NCT03905330/SAP_001.pdf",
-        "locator": "SAP cover and main text, protocol amendment 4",
-        "redistribution": "unverified"
+        "locator": "SAP pp. 1–89, protocol amendment 4",
+        "redistribution": "unverified",
+        "pdf_pages": [
+          1,
+          89
+        ],
+        "source_pdf_sha256": "882f71f539dd2c61a027b95d6ff52c6e10029172fce87cedaf6475b775e28ff6"
       },
       "shells": [
         {
@@ -86,30 +187,58 @@
           "type": "table",
           "label": "Model-based summary of change from baseline in total serum bile acids",
           "authenticity": "authentic",
-          "version": null,
-          "date": null,
+          "version": "Final 1.0",
+          "date": "2022-10-09",
           "linked_sap_id": "NCT03905330-SAP-v2.0",
           "url": "https://cdn.clinicaltrials.gov/large-docs/30/NCT03905330/SAP_001.pdf",
           "locator": "Table Shells p. 35, Table 14.2.2.2.1",
-          "redistribution": "unverified"
+          "redistribution": "unverified",
+          "pdf_pages": [
+            124,
+            124
+          ]
+        },
+        {
+          "document_id": "NCT03905330-LISTING-16.7.1",
+          "type": "listing",
+          "label": "Subject-level total serum bile acid by visit",
+          "authenticity": "authentic",
+          "version": "Final 1.0",
+          "date": "2022-10-13",
+          "linked_sap_id": "NCT03905330-SAP-v2.0",
+          "url": "https://cdn.clinicaltrials.gov/large-docs/30/NCT03905330/SAP_001.pdf",
+          "locator": "Listing Shells p. 26, Listing 16.7.1",
+          "redistribution": "unverified",
+          "pdf_pages": [
+            214,
+            214
+          ]
         }
       ],
-      "notes": "Table is present and shares the protocol amendment and project code with the SAP. Confirm the version pairing before acceptance. Listing 16.7.1 is indexed, but its actual layout still needs inspection."
+      "notes": "The public filing bundles the SAP, table shells, and listing shells. The three covers match protocol amendment 4 and project code MIRU8967. The SAP lists the selected table by ID, and the listing uses its corresponding total serum bile acid endpoint. The paired SAP version is inferred from these corroborating records. The shell covers provide their own dates and versions.",
+      "partition": "held_out"
     },
     {
       "family_id": "ISRCTN11079129",
       "protocol_id": "NIHR 13/93/10",
       "study_name": "E-SEE Main Trial",
-      "arms": ["E-SEE intervention", "Services as usual"],
-      "proposed_partition": "held_out",
+      "arms": [
+        "E-SEE intervention",
+        "Services as usual"
+      ],
       "source_status": "verified_pair",
       "sap": {
         "document_id": "ISRCTN11079129-SAP-v1",
         "version": "1",
         "date": "2020-02-06",
         "url": "https://www.york.ac.uk/media/healthsciences/documents/research/public-health/e-see/1_Statistical%20Analysis%20Plan%20%28main%20trial%29.pdf",
-        "locator": "Cover and SAP body, especially §§4, 7.5, 7.6, and 7.8",
-        "redistribution": "unverified"
+        "locator": "Main SAP pp. 1–31, before Appendix A starts on p. 32",
+        "redistribution": "unverified",
+        "pdf_pages": [
+          1,
+          31
+        ],
+        "source_pdf_sha256": "7452080b654a5f3963b8a085f3d7c08b7ec1604645d7050ffcb14600d1c6c5e4"
       },
       "shells": [
         {
@@ -121,8 +250,12 @@
           "date": "2020-02-06",
           "linked_sap_id": "ISRCTN11079129-SAP-v1",
           "url": "https://www.york.ac.uk/media/healthsciences/documents/research/public-health/e-see/1_Statistical%20Analysis%20Plan%20%28main%20trial%29.pdf",
-          "locator": "Appendix A, Table 6",
-          "redistribution": "unverified"
+          "locator": "Appendix A p. 36, Table 6",
+          "redistribution": "unverified",
+          "pdf_pages": [
+            36,
+            36
+          ]
         },
         {
           "document_id": "ISRCTN11079129-FIGURE-3",
@@ -135,35 +268,62 @@
           "url": "https://www.york.ac.uk/media/healthsciences/documents/research/public-health/e-see/1_Statistical%20Analysis%20Plan%20%28main%20trial%29.pdf",
           "locator": "Appendix A p. 38, Figure 3",
           "redistribution": "unverified",
-          "notes": "Dummy plot includes illustrative points. Use the template's display specification as the input."
+          "notes": "Dummy plot includes illustrative points. Use the template's display specification as the input.",
+          "pdf_pages": [
+            38,
+            38
+          ]
         }
       ],
-      "notes": "Table and figure are embedded in the same versioned SAP. Bound the SAP evidence to the analysis text and keep Appendix A display templates on the shell side."
+      "notes": "Table and figure are embedded in the same versioned SAP. Bound the SAP evidence to the analysis text and keep Appendix A display templates on the shell side.",
+      "partition": "held_out"
     },
     {
-      "family_id": "NCT02128555",
-      "protocol_id": "ISRCTN60672307",
-      "study_name": "TARVA",
-      "arms": ["Total ankle replacement", "Ankle arthrodesis"],
-      "proposed_partition": "development",
-      "source_status": "shell_to_inspect",
+      "family_id": "NCT03975894",
+      "protocol_id": "ISRCTN52684446",
+      "study_name": "TAPS-2",
+      "arms": [
+        "Serial prophylactic exchange blood transfusion",
+        "Usual care"
+      ],
       "sap": {
-        "document_id": "NCT02128555-SAP-TRIALS-2020",
-        "version": "Published SAP (DOI 10.1186/s13063-019-3973-4)",
-        "date": "2020-02-18",
-        "url": "https://link.springer.com/article/10.1186/s13063-019-3973-4",
-        "locator": "Statistical analyses and Supplementary information",
+        "document_id": "NCT03975894-SAP-TRIALS-2023",
+        "version": "Published SAP (DOI 10.1186/s13063-023-07235-x)",
+        "date": "2023-03-24",
+        "url": "https://link.springer.com/article/10.1186/s13063-023-07235-x",
+        "locator": "Statistical analysis plan and Neonatal outcomes sections of the version of record",
         "redistribution": "CC BY 4.0 (published article)"
       },
-      "shells": [],
-      "notes": "The SAP identifies Additional file 1 as its dummy tables. Inspect the DOCX supplement for a usable continuous-outcome shell before accepting this family."
-    },
+      "shells": [
+        {
+          "document_id": "NCT03975894-TABLE-S4",
+          "type": "table",
+          "label": "Birthweight summary by trial arm",
+          "authenticity": "authentic",
+          "version": "Additional file 1 (version of record)",
+          "date": "2023-03-24",
+          "linked_sap_id": "NCT03975894-SAP-TRIALS-2023",
+          "url": "https://media.springernature.com/original/springer-static/esm/art%3A10.1186%2Fs13063-023-07235-x/MediaObjects/13063_2023_7235_MOESM1_ESM.docx",
+          "locator": "Additional file 1, Table 4 (also listed as Table S4), Birthweight row and associated headers",
+          "redistribution": "unverified",
+          "source_sha256": "89e9e69003464dad9eda290bc1bf36e28227db2a6c33234ec09d182e4f438e2a"
+        }
+      ],
+      "notes": "The version of record links the original dummy table supplement. The birthweight row specifies mean and SD by arm without observations.",
+      "partition": "held_out",
+      "source_status": "verified_pair"
+    }
+  ],
+  "partition_frozen_on": "2026-11-13",
+  "reserve_sources": [
     {
       "family_id": "NCT02531035",
       "protocol_id": "LX4211.1-312-T1DM",
       "study_name": "inTandem3",
-      "arms": ["Sotagliflozin 400 mg", "Placebo"],
-      "proposed_partition": "development",
+      "arms": [
+        "Sotagliflozin 400 mg",
+        "Placebo"
+      ],
       "source_status": "sap_only",
       "sap": {
         "document_id": "NCT02531035-SAP-v1.0",
@@ -173,15 +333,16 @@
         "locator": "Cover and §§6.8.3.1, 6.8.4.1 for A1C by visit",
         "redistribution": "unverified"
       },
-      "shells": [],
       "notes": "The cover identifies the trial and SAP version. The SAP specifies descriptive A1C summaries by visit. No matching authentic artifact has been verified. Candidate for a constructed summary table if needed."
     },
     {
       "family_id": "NCT05345691",
       "protocol_id": "B1000-PMO-03-G-02",
       "study_name": "DEVOTE Part 1",
-      "arms": ["Bmab 1000", "Prolia"],
-      "proposed_partition": "held_out",
+      "arms": [
+        "Bmab 1000",
+        "Prolia"
+      ],
       "source_status": "sap_only",
       "sap": {
         "document_id": "NCT05345691-SAP-v1.0",
@@ -191,7 +352,6 @@
         "locator": "Cover, §2.1 for co-primary endpoints and §3 for trial design",
         "redistribution": "unverified"
       },
-      "shells": [],
       "notes": "Use only the initial two-arm, double-blind comparison. If no authentic shell can be verified, consider an explicitly constructed bone mineral density table. Keep the full trial family together across phases."
     }
   ]

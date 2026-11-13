@@ -8,7 +8,11 @@ Use the development family **NCT03469934** for the first annotation session. The
 
 The 20-component inventory samples a summary table, an illustrative figure shell, and a spirometry listing. It includes treatment headers, visit-specific statistic rows, legend entries, and a study-day footnote. SAP page numbers are local to the SAP. In this bundle the printed CSR page is one higher. [ANB020-004 statistical methods bundle](https://cdn.clinicaltrials.gov/large-docs/34/NCT03469934/SAP_001.pdf)
 
-All labels are drafts. For independent review, share the inventory with a second annotator and keep the reference annotations closed until they finish. Prioritize the listing population, the figure legend counts, the difference between predicted and actual FEV1, and the endpoint-specific baseline. Reconcile the annotations before using them as benchmark answers. Held-out annotation follows the final family split.
+All labels are drafts. For independent review, share the inventory with a second annotator and keep the reference annotations closed until they finish. Prioritize the listing population, the figure legend counts, the difference between predicted and actual FEV1, and the endpoint-specific baseline. Reconcile the annotations before using them as benchmark answers. The family split is frozen and the remaining sources are listed in the [source manifest](../data/source-manifest.json). Assign held-out annotation to reviewers and keep those answers outside agent development.
+
+## Additional development example
+
+The APRIL trial adds five draft components from the continuous key secondary outcome rows of Appendix Table 3. Its inventory includes the three-month header, PROMIS and EQ-VAS rows, the summary statistic label, and the baseline-adjustment footnote. [APRIL components](development/ISRCTN12368131/components.jsonl) · [APRIL draft annotations](development/ISRCTN12368131/reference-annotations.jsonl)
 
 ## Validate the records
 
@@ -19,6 +23,8 @@ python3 benchmark/validate_calibration.py
 ```
 
 For source verification, add `--pdf /path/to/SAP_001.pdf` using the original bundle linked above. This checks the manifest checksum and extracts each cited PDF page with Ghostscript 10.05.1 `txtwrite`. Collapse whitespace with `" ".join(text.split())` before applying `text_span`. The offsets identify a longer passage in this normalized text. The short `quote` anchors the passage for lookup. Use the resolved span for review and scoring.
+
+For APRIL, pass `--family ISRCTN12368131` and its own original PDF. [APRIL SAP](https://www.isrctn.com/editorial/retrieveFile/f9e43ab8-60c8-4eb7-875d-3afe157430ed/42176)
 
 ## Record boundaries
 
