@@ -29,4 +29,4 @@ Given a table, figure, or listing (TFL) shell and its corresponding statistical 
 
 Use one development family to calibrate annotation and then build a working path from shell parsing through reviewer export. Expand to all three shell types on development data before running the held-out evaluation.
 
-The project proposal defines requirements, and the planning slides capture the team's initial approach. [Project proposal](03_TFL_Component_to_SAP_Traceability_Agent.docx) · [Planning slides](TFL_SAP_Traceability_Agent_Planning_Present.pdf)
+The project proposal defines requirements, and the planning slides capture the team's initial approach. [Project proposal](classdocs/03_TFL_Component_to_SAP_Traceability_Agent.docx) · [Planning slides](classdocs/TFL_SAP_Traceability_Agent_Planning_Present.pdf)

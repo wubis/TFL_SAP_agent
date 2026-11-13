@@ -4,6 +4,8 @@
 
 **Input** — The proposal's scope and candidate public SAPs and TFL shells.
 
+**Working files** — [Source manifest](../../data/source-manifest.json) · [Collection notes and handoff](../../data/README.md)
+
 ## What to build
 
 1. Assign owners for data collection, annotation, implementation, and evaluation. Confirm with the TA the acceptable authentic-to-constructed mix, annotation review requirements, and demo format. Start source discovery while those details are pending.
