@@ -4,6 +4,26 @@
 
 **Input** — A matched shell and SAP version, the shared schema, and development examples.
 
+## Run the retrieval baseline
+
+The current CLI takes existing component records. It checks the shell and SAP pairing against the frozen manifest, verifies the PDF checksum, and indexes only the selected SAP pages. Candidate results carry the SAP version, page, original PDF page, detected section heading when available, and BM25 score. Reference annotations are read by the scoring script.
+
+Run from the repository root with Python 3.10+, `jsonschema`, and Ghostscript. Use the unchanged PDF linked in the [source manifest](../../data/source-manifest.json).
+
+```sh
+python3 -m traceability.retrieval \
+  --family NCT03469934 \
+  --pdf /path/to/SAP_001.pdf \
+  --components benchmark/development/NCT03469934/components.jsonl \
+  --top-k 10 > /tmp/traceability-retrieval.jsonl
+
+python3 benchmark/score_development_retrieval.py \
+  --family NCT03469934 \
+  --results /tmp/traceability-retrieval.jsonl
+```
+
+The development smoke run found 33 of 42 draft citation anchors in the top ten candidates across ANB020-004 and APRIL. It covered all required evidence groups for 17 of the 24 components that have citations. This diagnostic matches each short anchor on its recorded SAP page. Final scoring will need reviewed labels, full passage verification, and acceptance of equivalent spans.
+
 ## What to build
 
 1. Build document parsers. Extract TFL components with stable IDs, source locations, and context from nearby titles, labels, and notes. Split each SAP into retrievable passages while preserving its document version, section, and page. Verify the input pairing against the manifest.

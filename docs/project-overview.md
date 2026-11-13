@@ -29,4 +29,16 @@ Given a table, figure, or listing (TFL) shell and its corresponding statistical 
 
 Use one development family to calibrate annotation and then build a working path from shell parsing through reviewer export. Expand to all three shell types on development data before running the held-out evaluation.
 
+## Current state and next steps
+
+**November 13, 2026.** The [source manifest](../data/source-manifest.json) is frozen at six trial families, split three development and three held out. Both partitions cover tables, figures, and listings with authentic shells. The MARCH-PFIC pairing is inferred from the shared filing, protocol amendment, project code, and matching outputs. See the [source collection notes](../data/README.md) for provenance and page ranges.
+
+The [record schema](../schemas/traceability.schema.json), [annotation guide](../benchmark/annotation-guide.md), and validator are in place. The [development benchmark](../benchmark/README.md) has 25 validated draft annotations, 20 for ANB020-004 and five for APRIL. All 20 distinct evidence citations were previously checked against the original PDFs. Independent review, TARVA annotation, and held-out annotation are pending. Agent implementation, the reviewer interface, and evaluation are still ahead.
+
+1. **Calibrate with a second annotator.** Independently label the ANB020-004 inventory, then reconcile disagreements. Start with the spirometry listing's population and the figure legend's denominator. Record the resolutions before treating the labels as reference answers.
+2. **Finish benchmark coverage.** Assign owners for the remaining development and held-out annotations. Keep held-out answers outside agent development and record the agreed review protocol in the benchmark guide.
+3. **Start the agent on ANB020-004.** Use the manifest's page ranges to ingest SAP text and shell pages separately. Build page-aware SAP passages and BM25 retrieval, then produce a schema-valid mapping with an exact citation. This can proceed alongside annotation review using development inputs.
+
+Update this section at each milestone with the completed work, decisions that affect later steps, and the next action. Keep source and annotation details in their linked files.
+
 The project proposal defines requirements, and the planning slides capture the team's initial approach. [Project proposal](classdocs/03_TFL_Component_to_SAP_Traceability_Agent.docx) · [Planning slides](classdocs/TFL_SAP_Traceability_Agent_Planning_Present.pdf)
