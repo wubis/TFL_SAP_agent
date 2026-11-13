@@ -54,7 +54,21 @@ python3 -m traceability.shell_pipeline \
   --pdf /path/to/SAP_001.pdf --pdf-shells --ocr > /tmp/traceability-pdf-run.jsonl
 ```
 
-The PDF readers are tied to the three registered ANB020-004 layouts and check the original bundle checksum. All 57 authentic components matched the benchmark by ID, type, and normalized label in the development run. The figure reader normalizes visible OCR errors in `±95% CI` and the ANB020 name. The plotted dummy data are excluded. Context comes from the registered layout and nearby shell labels. Automated contextual assessment remains open.
+The PDF readers are tied to the three registered ANB020-004 layouts and check the original bundle checksum. All 57 authentic components matched the benchmark by ID, type, and normalized label in the development run. The figure reader normalizes visible OCR errors in `±95% CI` and the ANB020 name. The plotted dummy data are excluded. Context comes from the registered layout and nearby shell labels.
+
+## Connect an automated assessor
+
+Supply a command that reads one JSON request from standard input and writes a single assessment object to standard output. Put the command and its arguments last. Use `--assessor-timeout` to bound each call. The pipeline accepts either the assessor command or the file of reviewer judgments.
+
+```sh
+python3 -m traceability.shell_pipeline \
+  --pdf /path/to/SAP_001.pdf --ocr \
+  --assessor-timeout 60 --assessor /path/to/assessor-command
+```
+
+The request contains `instructions`, the shell component's `kind`, `label`, and `context` under `component`, the `sap_version`, a `constructed_shell` flag, `candidates` with their extraction metadata, and `display_conventions` when a constructed shell is in scope. The command gets the candidate evidence and receives no reference labels from the pipeline. Account for the source text the command receives when choosing where it runs.
+
+The response uses the same assessment fields as the reviewer file, with the component ID assigned by the pipeline. The pipeline checks quotations against retrieved passages, attaches page and section metadata, and validates the status and evidence structure. A timeout, invalid response, or failed citation stops the run before mapping output. A valid response can still require human review for contextual applicability. The adapter has been exercised with a deterministic smoke-test command. Model-backed accuracy is unmeasured.
 
 ## What to build
 

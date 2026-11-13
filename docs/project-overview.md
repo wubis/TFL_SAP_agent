@@ -37,9 +37,9 @@ The [benchmark](../benchmark/README.md) has 164 source-checked records across al
 
 The [Step 3 workflow](build/03-traceability-agent.md) searches the paired SAP with BM25 and optional OCR. On ANB020-004, OCR surfaced the scanned treatment-label rule in the top two for the four affected headers and legend entries. At the same top-ten cutoff, complete evidence-group coverage fell from 27 to 24 of 49 components with citations. The scorer checks retrieval against reference anchors. Final evaluation will also need contextual judgment and equivalent-span scoring.
 
-The constructed FEV1 Markdown shell and the three authentic ANB020-004 PDF layouts run directly through parsing, retrieval, and mapping. The authentic PDF run matched all 57 benchmark component IDs, types, and labels. The mapping CLI validates exact candidate quotations and accepts explicit reviewer judgments. Without judgments, mappings return `needs_review`. The reviewer interface, persistent decisions, and export remain pending.
+The constructed FEV1 Markdown shell and the three authentic ANB020-004 PDF layouts run directly through parsing, retrieval, and mapping. The authentic PDF run matched all 57 benchmark component IDs, types, and labels. The pipeline accepts reviewer judgments or an assessor command and validates exact candidate quotations. Without judgments, mappings return `needs_review`. The assessor integration has been smoke-tested with a deterministic command. The reviewer interface, persistent decisions, and export remain pending.
 
-1. **Automate contextual evidence assessment.** Check candidate applicability to the component's population, endpoint, visit, and analysis. Compare retrieval strategies for retaining both scanned and text-layer evidence at a fixed cutoff.
+1. **Evaluate a model-backed assessor.** Measure contextual applicability against reviewed development annotations. Compare retrieval strategies for retaining both scanned and text-layer evidence at a fixed cutoff.
 2. **Extend parsing beyond the calibration layouts.** Evaluate layouts from other development families before applying PDF extraction to held-out inputs.
 
 Update this section at each milestone with the completed work, decisions that affect later steps, and the next action. Keep source and annotation details in their linked files.

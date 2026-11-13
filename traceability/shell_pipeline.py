@@ -8,6 +8,7 @@ import subprocess
 from pathlib import Path
 
 from traceability.anb020_shells import parse_pdf_shells
+from traceability.assessment import assess_components
 from traceability.mapping import build_mappings, read_jsonl
 from traceability.retrieval import ROOT, retrieve_components, select_family
 
@@ -72,10 +73,15 @@ def main():
     source.add_argument("--shell", type=Path, help="Original registered Markdown shell, defaults to the repository copy")
     source.add_argument("--pdf-shells", action="store_true", help="Parse the authentic table, figure, and listing in the PDF")
     parser.add_argument("--pdftotext", default="pdftotext", help="Poppler pdftotext executable for PDF shell layout")
-    parser.add_argument("--assessments", type=Path, help="Optional reviewer judgments indexed by component ID")
+    assessor = parser.add_mutually_exclusive_group()
+    assessor.add_argument("--assessments", type=Path, help="Optional reviewer judgments indexed by component ID")
+    assessor.add_argument("--assessor", nargs=argparse.REMAINDER, help="Assessment command and arguments. Place this option last.")
+    parser.add_argument("--assessor-timeout", type=float, default=60, help="Maximum seconds for one component assessment")
     parser.add_argument("--top-k", type=int, default=10)
     parser.add_argument("--ocr", action="store_true")
     args = parser.parse_args()
+    if args.assessor is not None and (not args.assessor or not 0 < args.assessor_timeout < float("inf")):
+        parser.error("--assessor requires a command and a positive finite timeout")
     try:
         manifest = json.loads((ROOT / "data/source-manifest.json").read_text(encoding="utf-8"))
         family = select_family(manifest, "NCT03469934")
@@ -86,9 +92,13 @@ def main():
             components = parse_shell(family, shell, args.shell or ROOT / shell["local_path"])
         retrieved = retrieve_components(family, args.pdf, components, args.top_k, ocr=args.ocr)
         results = {item["component_id"]: item for item in retrieved}
-        decisions = read_jsonl(args.assessments) if args.assessments else {}
         schema = json.loads((ROOT / "schemas/traceability.schema.json").read_text(encoding="utf-8"))
         rules = json.loads((ROOT / "benchmark/display-conventions.json").read_text(encoding="utf-8"))
+        decisions = read_jsonl(args.assessments) if args.assessments else {}
+        if args.assessor:
+            decisions = assess_components(
+                components, results, rules["conventions"], args.assessor, args.assessor_timeout, schema,
+            )
         mappings = build_mappings(results, decisions, {rule["convention_id"] for rule in rules["conventions"]}, schema)
         for component, mapping in zip(components, mappings, strict=True):
             print(json.dumps({"component": component, "retrieval": results[component["component_id"]],
