@@ -35,12 +35,12 @@ Use one development family to calibrate annotation and then build a working path
 
 The [benchmark](../benchmark/README.md) has 164 source-checked records across all six trial families, including 82 held-out records. A blind second AI annotation reconciled the original ANB020-004 calibration set. The other annotations received AI source audits. Team sign-off remains open.
 
-The [BM25 retrieval baseline](build/03-traceability-agent.md#run-the-retrieval-baseline) takes an existing component inventory and searches only the paired SAP pages. On the updated ANB020-004 and APRIL records, its top ten candidates matched 77 of 109 citation anchor occurrences and covered all required evidence groups for 35 of 59 components with citations. These are development retrieval diagnostics. Automated shell parsing, evidence verification, and reviewer export are still ahead.
+The [Step 3 workflow](build/03-traceability-agent.md) searches the paired SAP with BM25 and optional OCR. On ANB020-004, OCR surfaced the scanned treatment-label rule in the top two for the four affected headers and legend entries. At the same top-ten cutoff, complete evidence-group coverage fell from 27 to 24 of 49 components with citations. The scorer checks retrieval against reference anchors. Final evaluation will also need contextual judgment and equivalent-span scoring.
 
-The [Step 3 workflow](build/03-traceability-agent.md) can search scanned pages with `--ocr` and turn explicit reviewer judgments into validated mappings. The constructed FEV1 Markdown shell now runs directly through parsing, retrieval, and mapping. All seven parsed component IDs match the benchmark inventory.
+The constructed FEV1 Markdown shell and the three authentic ANB020-004 PDF layouts run directly through parsing, retrieval, and mapping. The authentic PDF run matched all 57 benchmark component IDs, types, and labels. The mapping CLI validates exact candidate quotations and accepts explicit reviewer judgments. Without judgments, mappings return `needs_review`. The reviewer interface, persistent decisions, and export remain pending.
 
 1. **Automate contextual evidence assessment.** Check candidate applicability to the component's population, endpoint, visit, and analysis. Compare retrieval strategies for retaining both scanned and text-layer evidence at a fixed cutoff.
-2. **Extend shell parsing to the authentic sources.** Run the ANB020-004 table, figure, and listing from their PDF shell pages through the same workflow.
+2. **Extend parsing beyond the calibration layouts.** Evaluate layouts from other development families before applying PDF extraction to held-out inputs.
 
 Update this section at each milestone with the completed work, decisions that affect later steps, and the next action. Keep source and annotation details in their linked files.
 

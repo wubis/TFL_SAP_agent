@@ -1,4 +1,4 @@
-"""Parse the registered FEV1 Markdown shell and run retrieval and mapping."""
+"""Parse registered ANB020-004 shells and run retrieval and mapping."""
 
 import argparse
 import hashlib
@@ -7,6 +7,7 @@ import re
 import subprocess
 from pathlib import Path
 
+from traceability.anb020_shells import parse_pdf_shells
 from traceability.mapping import build_mappings, read_jsonl
 from traceability.retrieval import ROOT, retrieve_components, select_family
 
@@ -67,7 +68,10 @@ def parse_shell(family, shell, path):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--pdf", required=True, type=Path, help="Original paired SAP bundle")
-    parser.add_argument("--shell", type=Path, help="Original registered Markdown shell, defaults to the repository copy")
+    source = parser.add_mutually_exclusive_group()
+    source.add_argument("--shell", type=Path, help="Original registered Markdown shell, defaults to the repository copy")
+    source.add_argument("--pdf-shells", action="store_true", help="Parse the authentic table, figure, and listing in the PDF")
+    parser.add_argument("--pdftotext", default="pdftotext", help="Poppler pdftotext executable for PDF shell layout")
     parser.add_argument("--assessments", type=Path, help="Optional reviewer judgments indexed by component ID")
     parser.add_argument("--top-k", type=int, default=10)
     parser.add_argument("--ocr", action="store_true")
@@ -75,8 +79,11 @@ def main():
     try:
         manifest = json.loads((ROOT / "data/source-manifest.json").read_text(encoding="utf-8"))
         family = select_family(manifest, "NCT03469934")
-        shell = next(item for item in family["shells"] if item["document_id"] == SHELL_ID)
-        components = parse_shell(family, shell, args.shell or ROOT / shell["local_path"])
+        if args.pdf_shells:
+            components = list(parse_pdf_shells(family, args.pdf, args.pdftotext))
+        else:
+            shell = next(item for item in family["shells"] if item["document_id"] == SHELL_ID)
+            components = parse_shell(family, shell, args.shell or ROOT / shell["local_path"])
         retrieved = retrieve_components(family, args.pdf, components, args.top_k, ocr=args.ocr)
         results = {item["component_id"]: item for item in retrieved}
         decisions = read_jsonl(args.assessments) if args.assessments else {}

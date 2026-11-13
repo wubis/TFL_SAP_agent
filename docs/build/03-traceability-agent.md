@@ -45,7 +45,16 @@ python3 -m traceability.shell_pipeline \
   --pdf /path/to/SAP_001.pdf --ocr > /tmp/traceability-shell-run.jsonl
 ```
 
-The parser supports version 1.0 of this constructed Markdown shell. It uses the table and note positions to preserve the existing inventory IDs. It keeps both trial arms in context for dummy treatment labels until the SAP evidence resolves each label. The authentic PDF table, figure, and listing still use the component-inventory entry point. Automated contextual verification remains open.
+The Markdown reader supports the constructed shell's registered version. It uses the table and note positions to preserve the existing inventory IDs. It keeps both trial arms in context for dummy treatment labels until the SAP evidence resolves each label.
+
+For the authentic table, figure, and listing, pass `--pdf-shells`. The reader uses Poppler `pdftotext -layout` for table and listing columns, and Ghostscript and Tesseract for the figure page. Use `--pdftotext /path/to/pdftotext` when Poppler is outside `PATH`. `--ocr` also enables OCR on scanned SAP evidence pages.
+
+```sh
+python3 -m traceability.shell_pipeline \
+  --pdf /path/to/SAP_001.pdf --pdf-shells --ocr > /tmp/traceability-pdf-run.jsonl
+```
+
+The PDF readers are tied to the three registered ANB020-004 layouts and check the original bundle checksum. All 57 authentic components matched the benchmark by ID, type, and normalized label in the development run. The figure reader normalizes visible OCR errors in `±95% CI` and the ANB020 name. The plotted dummy data are excluded. Context comes from the registered layout and nearby shell labels. Automated contextual assessment remains open.
 
 ## What to build
 
