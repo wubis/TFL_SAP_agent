@@ -49,6 +49,7 @@
         "section": { "$ref": "#/$defs/text" },
         "page": { "type": "integer", "minimum": 1 },
         "quote": { "$ref": "#/$defs/text" },
+        "extraction": { "enum": ["pdf_text", "ocr"], "description": "How the citation anchor was checked. Defaults to the PDF text layer." },
         "text_span": {
           "description": "Optional full reference passage in the whitespace-normalized text of the cited page. Zero-based Unicode character offsets, end exclusive.",
           "type": "object",

@@ -1,0 +1,9 @@
+{
+  "conventions": [
+    {
+      "convention_id": "not-applicable-em-dash",
+      "scope": "Constructed project fixtures that explicitly use an em dash for a cell that does not apply.",
+      "rule": "Use an em dash to display a cell that does not apply. The symbol does not define missingness, change the denominator, or exclude an observation."
+    }
+  ]
+}

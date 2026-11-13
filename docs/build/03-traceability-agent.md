@@ -22,7 +22,7 @@ python3 benchmark/score_development_retrieval.py \
   --results /tmp/traceability-retrieval.jsonl
 ```
 
-The development smoke run found 33 of 42 draft citation anchors in the top ten candidates across ANB020-004 and APRIL. It covered all required evidence groups for 17 of the 24 components that have citations. This diagnostic matches each short anchor on its recorded SAP page. Final scoring will need reviewed labels, full passage verification, and acceptance of equivalent spans.
+The initial smoke run used 25 draft annotations across ANB020-004 and APRIL. Its results form a historical baseline. The reviewed benchmark covers additional components and includes evidence on scanned pages. The current retriever reads the PDF text layer. OCR intake, full passage verification, and acceptance of equivalent spans remain necessary for final evaluation.
 
 ## What to build
 

@@ -4,27 +4,40 @@
 
 ## Calibration set
 
-Use the development family **NCT03469934** for the first annotation session. The component inventory and first-pass labels are in [components.jsonl](development/NCT03469934/components.jsonl) and [reference-annotations.jsonl](development/NCT03469934/reference-annotations.jsonl). Each line is an independent JSON record.
+The development calibration family is **NCT03469934 (ANB020-004)**. The [component inventory](development/NCT03469934/components.jsonl) and [reference annotations](development/NCT03469934/reference-annotations.jsonl) cover three authentic shells and a constructed FEV1 challenge. Each line is an independent JSON record.
 
-The 20-component inventory samples a summary table, an illustrative figure shell, and a spirometry listing. It includes treatment headers, visit-specific statistic rows, legend entries, and a study-day footnote. SAP page numbers are local to the SAP. In this bundle the printed CSR page is one higher. [ANB020-004 statistical methods bundle](https://cdn.clinicaltrials.gov/large-docs/34/NCT03469934/SAP_001.pdf)
+The [calibration review](development/NCT03469934/calibration-review.jsonl) records a blind second AI annotation of the original 20 components. The two passes initially agreed on 16 statuses. Reconciliation changed four treatment header and legend labels to `needs_review` after the second pass found a scanned appendix prescribing dummy group names. The spirometry listing's population scope remains an unresolved SAP question. SAP pages in citations use the SAP's own numbering. The printed CSR page is one higher. [ANB020-004 statistical methods bundle](https://cdn.clinicaltrials.gov/large-docs/34/NCT03469934/SAP_001.pdf)
 
-All labels are drafts. For independent review, share the inventory with a second annotator and keep the reference annotations closed until they finish. Prioritize the listing population, the figure legend counts, the difference between predicted and actual FEV1, and the endpoint-specific baseline. Reconcile the annotations before using them as benchmark answers. The family split is frozen and the remaining sources are listed in the [source manifest](../data/source-manifest.json). Assign held-out annotation to reviewers and keep those answers outside agent development.
+The remaining records were reviewed against the published sources by AI annotators. Here `reviewed` records source audit or reconciliation. Team sign-off and any required independent human review remain separate from that status. A reviewed annotation can still classify a component as `needs_review` where the SAP and shell leave a substantive question open.
 
-## Additional development example
+## Development and held-out coverage
 
-The APRIL trial adds five draft components from the continuous key secondary outcome rows of Appendix Table 3. Its inventory includes the three-month header, PROMIS and EQ-VAS rows, the summary statistic label, and the baseline-adjustment footnote. [APRIL components](development/ISRCTN12368131/components.jsonl) · [APRIL draft annotations](development/ISRCTN12368131/reference-annotations.jsonl)
+The benchmark has 164 reviewed records across the selected shell regions. The authentic shells remain the source corpus, with one constructed challenge fixture in development.
+
+| Partition | Family | Components |
+| --- | --- | ---: |
+| Development | ANB020-004 | 64 |
+| Development | APRIL | 11 |
+| Development | TARVA | 7 |
+| Held out | MARCH-PFIC | 41 |
+| Held out | E-SEE | 33 |
+| Held out | TAPS-2 | 8 |
+
+APRIL covers the continuous key secondary outcomes in Appendix Table 3. TARVA covers the selected MOXFQ walking/standing rows and associated headers in Table S4. The TARVA shell describes follow-up from randomisation, while the SAP describes follow-up from surgery. [APRIL records](development/ISRCTN12368131) · [TARVA records](development/NCT02128555)
+
+The evaluation reference files live under `benchmark/held_out/` and cover MARCH-PFIC, E-SEE, and TAPS-2. Keep that directory outside agent development inputs and retrieval. The development scorer restricts reference reads to development families. Use the held-out inventories only as inputs for retrieval-only evaluation, and use the held-out answers only for scoring and reviewer audit.
 
 ## Validate the records
 
 With Python 3.10+ and Python's `jsonschema` package installed, run from the repository root.
 
 ```sh
-python3 benchmark/validate_calibration.py
+python3 benchmark/validate_calibration.py --require-reviewed
 ```
 
-For source verification, add `--pdf /path/to/SAP_001.pdf` using the original bundle linked above. This checks the manifest checksum and extracts each cited PDF page with Ghostscript 10.05.1 `txtwrite`. Collapse whitespace with `" ".join(text.split())` before applying `text_span`. The offsets identify a longer passage in this normalized text. The short `quote` anchors the passage for lookup. Use the resolved span for review and scoring.
+For source verification, add `--pdf /path/to/SAP_001.pdf` using the original linked in the manifest. This checks the checksum and extracts cited pages with Ghostscript 10.05.1 `txtwrite`. Citations marked `ocr` use a 200 DPI render and Tesseract 5.5.1 with `--psm 3`. Collapse whitespace with `" ".join(text.split())` before applying `text_span`. The short `quote` anchors the longer passage. Use the resolved span and consult the source image when checking scanned evidence.
 
-For APRIL, pass `--family ISRCTN12368131` and its own original PDF. [APRIL SAP](https://www.isrctn.com/editorial/retrieveFile/f9e43ab8-60c8-4eb7-875d-3afe157430ed/42176)
+For any other family, pass `--family FAMILY_ID` and its own original PDF. The validator reads the frozen partition from the manifest and reports aggregate validation counts for held-out families. [Source manifest](../data/source-manifest.json)
 
 ## Record boundaries
 

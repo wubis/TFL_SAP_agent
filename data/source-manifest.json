@@ -75,6 +75,18 @@
             124
           ],
           "redistribution": "unverified"
+        },
+        {
+          "document_id": "NCT03469934-CHALLENGE-FEV1",
+          "type": "table",
+          "label": "Constructed FEV1 terminology and display challenge",
+          "authenticity": "constructed",
+          "version": "1.0",
+          "date": "2026-11-13",
+          "linked_sap_id": "NCT03469934-SAP-v1.0",
+          "local_path": "data/shells/anb020-004-fev1-challenge.md",
+          "locator": "FEV1 summary and display notes",
+          "redistribution": "project-authored fixture"
         }
       ],
       "notes": "The bundle inventory lists the SAP and all three shell documents together, dated 18 December 2018. The later ACQ-5 file note is outside the selected SAP evidence.",
@@ -93,8 +105,10 @@
         "document_id": "NCT02128555-SAP-TRIALS-2020",
         "version": "Published SAP (DOI 10.1186/s13063-019-3973-4)",
         "date": "2020-02-18",
-        "url": "https://link.springer.com/article/10.1186/s13063-019-3973-4",
+        "url": "https://discovery.ucl.ac.uk/id/eprint/10092165/1/s13063-019-3973-4.pdf",
         "locator": "Statistical analyses and Supplementary information",
+        "pdf_pages": [1, 9],
+        "source_pdf_sha256": "909c3a44b32133af1faeb5d2a2b539265c0c5fad2fe1ad1bd40473bc23e40263",
         "redistribution": "CC BY 4.0 (published article)"
       },
       "shells": [
@@ -290,8 +304,10 @@
         "document_id": "NCT03975894-SAP-TRIALS-2023",
         "version": "Published SAP (DOI 10.1186/s13063-023-07235-x)",
         "date": "2023-03-24",
-        "url": "https://link.springer.com/article/10.1186/s13063-023-07235-x",
+        "url": "https://link.springer.com/content/pdf/10.1186/s13063-023-07235-x.pdf",
         "locator": "Statistical analysis plan and Neonatal outcomes sections of the version of record",
+        "pdf_pages": [1, 6],
+        "source_pdf_sha256": "e36d951f031585b0af0506fb366a42fc2f54e403475ca5a1f05408ccd89f5631",
         "redistribution": "CC BY 4.0 (published article)"
       },
       "shells": [

@@ -4,13 +4,15 @@
 
 ## Inventory the shell
 
-1. Confirm the shell and SAP versions against the source manifest. Identify their page numbering before recording citations.
+1. Confirm the shell and SAP versions against the source manifest. Identify their page numbering before recording citations. Where the manifest selects a slice of a larger shell, inventory the specified outcome rows and associated headers and notes.
 2. Capture the smallest selectable unit carrying a reporting specification, such as a title, population label, row or column label, axis, legend entry, uncertainty label, selection note, or footnote. Give it a stable ID and a locator pointing to the exact instance. Preserve the displayed wording and put inferred meaning in the analysis context or rationale.
 3. Carry the enclosing endpoint, visit, population, treatment group, and nearby labels into the component. Use `null` for an unavailable scalar context field and an empty array for unavailable group or label lists. Keep data cells and decorative marks out of the inventory. Explicitly identify illustrative figure ticks and artwork so the team can decide which reporting specifications they actually express.
 
 ## Assess SAP support
 
 Search the paired SAP for definitions, general rules, endpoint methods, and relevant exceptions. Use the evidence section and the page printed within the SAP. Record the smallest exact span that supports the claim and expand it when a qualifier is necessary. A record can store a short exact `quote` with a `text_span` that identifies the complete passage in a reproducible page extraction. Normalize line breaks and incidental whitespace. Preserve words, negation, punctuation, and units. For text spanning pages, cite each contributing page as its own passage.
+
+Inspect scanned appendix pages and tables when the extracted text has gaps. Use `extraction: "ocr"` for anchors in image-only pages and check them visually. An anchor that survives OCR can identify the longer region even where the OCR misreads a treatment code or symbol.
 
 | Status | When to use it | Calibration example |
 | --- | --- | --- |
@@ -35,8 +37,8 @@ Use a reference `evidence_groups` entry for each substantiated claim or conflict
 | SD, SE, CI, LS mean | Standard deviation, standard error, confidence interval, and least-squares mean. Check the statistic and whether it describes observations or a fitted estimate. |
 | CFB, EOS, ET | Change from baseline, end of study, and early termination. Check the endpoint-specific baseline and visit definitions. |
 
-The approved display convention list is empty pending team review. Candidate conventions for discussion include placeholder typography and line or marker styling. Once approved, give each convention a stable ID and documented scope. Record applicable IDs in `convention_ids`. A convention-only component uses `not_found_in_supplied_sap` and has no SAP evidence. Where the SAP specifies a display detail, assess it using the SAP passage.
+The [display convention list](display-conventions.json) establishes an em dash for inapplicable cells in the constructed challenge fixture. A convention applies only within its recorded scope. Record applicable IDs in `convention_ids`. A convention-only component uses `not_found_in_supplied_sap` and has no SAP evidence. Where the SAP specifies a display detail, assess it using the SAP passage.
 
 ## Review protocol
 
-For calibration, have a second person independently label the same components before reading the drafts. Compare component boundaries, citation spans, status, and which evidence is required. Resolve disagreements against the selected SAP and document the resolution in `review_note`. Use `reviewed` only once that review is recorded. Confirm with the team and TA how to extend review to the remaining families. Track benchmark coverage of paraphrases, similar populations, endpoint-specific exceptions, multi-section support, convention-only components, unsupported footnotes, and incomplete specifications.
+For calibration, use a second annotator who independently labels the same components before seeing the drafts. Compare component boundaries, citation spans, status, and which evidence is required. Resolve disagreements against the selected SAP and document the resolution in `review_note`. For other records, document the source audit or independent review performed. Keep any team or TA sign-off requirement explicit. Track benchmark coverage of paraphrases, similar populations, endpoint-specific exceptions, multi-section support, convention-only components, unsupported footnotes, and incomplete specifications.

@@ -25,4 +25,4 @@ For any bundle that contains both SAP text and shell pages, put the selected she
 
 ## Annotation handoff
 
-Begin the independent calibration review and assign annotators for the other families. The authentic source set is ready. Team ownership, annotation review requirements, and demo format still need to be recorded. Challenge variants may be added to a selected family in its existing partition, with their construction recorded in the manifest.
+The [benchmark](../benchmark/README.md) covers all six selected families. One [constructed FEV1 challenge](shells/anb020-004-fev1-challenge.md) stays with ANB020-004 in development. Team ownership, any additional review requirements, and demo format still need to be recorded.

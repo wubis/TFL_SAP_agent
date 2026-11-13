@@ -33,11 +33,12 @@ Use one development family to calibrate annotation and then build a working path
 
 **November 13, 2026.** The [source manifest](../data/source-manifest.json) is frozen at six trial families, split three development and three held out. Both partitions cover tables, figures, and listings with authentic shells. The MARCH-PFIC pairing is inferred from the shared filing, protocol amendment, project code, and matching outputs. See the [source collection notes](../data/README.md) for provenance and page ranges.
 
-The [record schema](../schemas/traceability.schema.json), [annotation guide](../benchmark/annotation-guide.md), and validator are in place. The [development benchmark](../benchmark/README.md) has 25 validated draft annotations, 20 for ANB020-004 and five for APRIL. All 20 distinct evidence citations were previously checked against the original PDFs. Independent review, TARVA annotation, and held-out annotation are pending. Agent implementation, the reviewer interface, and evaluation are still ahead.
+The [benchmark](../benchmark/README.md) has 164 source-checked records across all six trial families, including 82 held-out records. A blind second AI annotation reconciled the original ANB020-004 calibration set. The other annotations received AI source audits. Team sign-off remains open.
 
-1. **Calibrate with a second annotator.** Independently label the ANB020-004 inventory, then reconcile disagreements. Start with the spirometry listing's population and the figure legend's denominator. Record the resolutions before treating the labels as reference answers.
-2. **Finish benchmark coverage.** Assign owners for the remaining development and held-out annotations. Keep held-out answers outside agent development and record the agreed review protocol in the benchmark guide.
-3. **Start the agent on ANB020-004.** Use the manifest's page ranges to ingest SAP text and shell pages separately. Build page-aware SAP passages and BM25 retrieval, then produce a schema-valid mapping with an exact citation. This can proceed alongside annotation review using development inputs.
+The [BM25 retrieval baseline](build/03-traceability-agent.md#run-the-retrieval-baseline) takes an existing component inventory and searches only the paired SAP pages. On the two development families, its top ten candidates matched 33 of 42 draft citation anchor occurrences and covered all required evidence groups for 17 of 24 components with citations. This measures retrieval against draft anchors. Automated shell parsing, evidence verification, and reviewer export are still ahead.
+
+1. **Include scanned SAP pages in retrieval.** The ANB020-004 reconciliation found a treatment label rule in an image-only appendix. Use the development annotations to check OCR coverage.
+2. **Turn retrieved passages into verified mappings.** Start with the ANB020-004 inventory. Check that each candidate applies to the component's population, endpoint, visit, and analysis. Verify quotations and page references before emitting schema-valid mappings. Exercise a multi-passage case and an abstention case, then connect shell parsing to the same path.
 
 Update this section at each milestone with the completed work, decisions that affect later steps, and the next action. Keep source and annotation details in their linked files.
 
