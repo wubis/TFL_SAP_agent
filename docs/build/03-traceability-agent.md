@@ -34,7 +34,18 @@ python3 -m traceability.mapping \
   --assessments /path/to/assessments.jsonl > /tmp/traceability-mappings.jsonl
 ```
 
-Use a result file produced by the retrieval command with the selected SAP. The mapping command checks consistency with that file. The assessor supplies the contextual support judgment. Automated contextual verification and shell parsing remain to be implemented.
+Use a result file produced by the retrieval command with the selected SAP. The mapping command checks consistency with that file. The assessor supplies the contextual support judgment.
+
+## Run from the source shell
+
+The one-command pipeline parses the registered [FEV1 Markdown challenge](../../data/shells/anb020-004-fev1-challenge.md), verifies its checksum and paired SAP, and returns one JSON record per component with its candidates and validated mapping. It reads the source shell and SAP directly. Its optional `--assessments` file has the same format as the mapping command above.
+
+```sh
+python3 -m traceability.shell_pipeline \
+  --pdf /path/to/SAP_001.pdf --ocr > /tmp/traceability-shell-run.jsonl
+```
+
+The parser supports version 1.0 of this constructed Markdown shell. It uses the table and note positions to preserve the existing inventory IDs. It keeps both trial arms in context for dummy treatment labels until the SAP evidence resolves each label. The authentic PDF table, figure, and listing still use the component-inventory entry point. Automated contextual verification remains open.
 
 ## What to build
 

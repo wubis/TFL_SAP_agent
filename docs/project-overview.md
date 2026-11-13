@@ -37,10 +37,10 @@ The [benchmark](../benchmark/README.md) has 164 source-checked records across al
 
 The [BM25 retrieval baseline](build/03-traceability-agent.md#run-the-retrieval-baseline) takes an existing component inventory and searches only the paired SAP pages. On the updated ANB020-004 and APRIL records, its top ten candidates matched 77 of 109 citation anchor occurrences and covered all required evidence groups for 35 of 59 components with citations. These are development retrieval diagnostics. Automated shell parsing, evidence verification, and reviewer export are still ahead.
 
-The [Step 3 workflow](build/03-traceability-agent.md) can search scanned pages with `--ocr` and turn explicit reviewer judgments into validated mappings. It recovered the image-only treatment naming rule and exercised multi-passage and abstention cases on ANB020-004.
+The [Step 3 workflow](build/03-traceability-agent.md) can search scanned pages with `--ocr` and turn explicit reviewer judgments into validated mappings. The constructed FEV1 Markdown shell now runs directly through parsing, retrieval, and mapping. All seven parsed component IDs match the benchmark inventory.
 
 1. **Automate contextual evidence assessment.** Check candidate applicability to the component's population, endpoint, visit, and analysis. Compare retrieval strategies for retaining both scanned and text-layer evidence at a fixed cutoff.
-2. **Connect shell parsing.** Run from the source shell through extraction, retrieval, and mapping on one development family.
+2. **Extend shell parsing to the authentic sources.** Run the ANB020-004 table, figure, and listing from their PDF shell pages through the same workflow.
 
 Update this section at each milestone with the completed work, decisions that affect later steps, and the next action. Keep source and annotation details in their linked files.
 

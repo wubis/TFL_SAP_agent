@@ -128,10 +128,27 @@ def component_query(component):
     return query
 
 
-def retrieve(manifest, family_id, pdf, component_path, limit, *, ocr=False):
+def select_family(manifest, family_id):
     family = next((item for item in manifest["families"] if item["family_id"] == family_id), None)
     if manifest["partition_status"] != "frozen" or family is None or family["source_status"] != "verified_pair":
         raise ValueError("Select a verified family from the frozen source manifest")
+    return family
+
+
+def read_components(component_path):
+    for line_number, line in enumerate(component_path.read_text(encoding="utf-8").splitlines(), 1):
+        try:
+            yield json.loads(line)
+        except json.JSONDecodeError as exc:
+            raise ValueError(f"Component line {line_number}: {exc.msg}") from exc
+
+
+def retrieve(manifest, family_id, pdf, component_path, limit, *, ocr=False):
+    return retrieve_components(select_family(manifest, family_id), pdf, read_components(component_path), limit, ocr=ocr)
+
+
+def retrieve_components(family, pdf, records, limit, *, ocr=False):
+    family_id = family["family_id"]
     sap = family["sap"]
     if not sap.get("pdf_pages") or not sap.get("source_pdf_sha256"):
         raise ValueError("The selected SAP has no verified PDF page range and checksum")
@@ -142,11 +159,7 @@ def retrieve(manifest, family_id, pdf, component_path, limit, *, ocr=False):
     components = []
     component_ids = set()
     shells = {shell["document_id"]: shell for shell in family["shells"]}
-    for line_number, line in enumerate(component_path.read_text(encoding="utf-8").splitlines(), 1):
-        try:
-            component = json.loads(line)
-        except json.JSONDecodeError as exc:
-            raise ValueError(f"Component line {line_number}: {exc.msg}") from exc
+    for line_number, component in enumerate(records, 1):
         if not isinstance(component, dict) or component.get("record_type") != "component" or not validator.is_valid(component):
             raise ValueError(f"Component line {line_number}: expected a schema-valid component record")
         shell = shells.get(component["shell_id"])

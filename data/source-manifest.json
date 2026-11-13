@@ -85,6 +85,7 @@
           "date": "2026-11-13",
           "linked_sap_id": "NCT03469934-SAP-v1.0",
           "local_path": "data/shells/anb020-004-fev1-challenge.md",
+          "source_sha256": "27b36ddb29fbbcb5861c764bf2664cad18582794ab5d2f3de2244d9e79f3cf5e",
           "locator": "FEV1 summary and display notes",
           "redistribution": "project-authored fixture"
         }
