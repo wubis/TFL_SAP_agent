@@ -48,7 +48,8 @@ A component is the smallest selectable unit of a shell that carries a reporting 
 | Relevant mention | A passage that uses the component's words under a different population, endpoint, visit, or analysis. It is not support. |
 | Support | Evidence that applies to the component in its context. Several passages may be needed together, for example a population definition and the section that applies it to the endpoint. |
 | Evidence group | In a reference annotation, one claim the evidence must establish. Every group must be covered. Inside a group, any one alternative is enough, and all passages in that alternative are required together. |
-| Equivalent span | A different quotation that establishes the same claim as a reference anchor. Scoring accepts it after a human check. |
+| Equivalent span | A different quotation that establishes the same claim as a reference anchor. Scoring accepts it after a blind human ruling. |
+| Unverified link | A link whose quotation cannot be found in the passage it cites, or whose source passage was not saved. It never earns credit. |
 | Display convention | A presentation rule the team has approved, recorded in the display convention list with its scope. It is never given a SAP citation. |
 | Extraction method | `pdf_text` for a text layer, `ocr` for a scanned page. Check OCR quotations against the page image when a character affects the meaning. |
 

@@ -93,11 +93,21 @@ python3 -m traceability.agent --family NCT03469934 --pdf /path/to/SAP_001.pdf --
   --log runs/agent-log.jsonl --summary runs/agent-summary.json > runs/agent-run.jsonl
 ```
 
-Use `--limit 3` for a trial run. The output is a run file with the passages the model saw, the validated mapping, and a trace of its lookups, so the reviewer interface and the scorers read it directly. The agent may answer `not_found_in_supplied_sap` after searching and must say what it searched for. Its loop, limits, and quotation checks are covered by tests with a stand-in client and its lookups were exercised on the real ANB020-004 SAP. It has yet to run against the API.
+Use `--limit 3` for a trial run and `--max-usd` to stop before the next component once estimated spend reaches a cap. The output is a run file with the passages the model saw, the validated mapping, a trace of its lookups, and the run's settings with a fingerprint of the code that produced it, so the reviewer interface and the scorers read it directly.
+
+The agent may answer `not_found_in_supplied_sap` after a documented search. It must run at least one lookup first, and code writes the list of searches into the rationale. A component that rests only on a display convention takes the same status with the convention ID and no SAP passage. The assessor command and the LLM baseline follow the same rule, and each names the search behind a not-found answer. Its loop, limits, and quotation checks are covered by tests with a stand-in client and its lookups were exercised on the real ANB020-004 SAP. It has yet to run against the API.
 
 ## Hybrid retrieval
 
-`traceability.hybrid` combines the BM25 ranking with an embedding ranking by reciprocal rank fusion and writes results in the same shape as the BM25 command, so `score_development_retrieval.py` compares the two. Pass a local model with `--embedder`, for example `fastembed:BAAI/bge-small-en-v1.5`. The fusion is tested with a toy embedder. No embedding model has been run, so there is no hybrid result.
+`traceability.hybrid` combines the BM25 ranking with an embedding ranking by reciprocal rank fusion and writes results in the same shape as the BM25 command, so the same scorers compare the two. Pass a local model with `--embedder`: `fastembed:BAAI/bge-small-en-v1.5` for a small general model (needs `fastembed`), or `medcpt:ncbi` for MedCPT's query and article encoders (needs `torch` and `transformers`).
+
+```sh
+python3 -m traceability.hybrid --family NCT03469934 --pdf /path/to/SAP_001.pdf \
+  --components benchmark/development/NCT03469934/components.jsonl \
+  --embedder fastembed:BAAI/bge-small-en-v1.5 --top-k 10 > runs/hybrid-NCT03469934.jsonl
+```
+
+On the three development families, text layer only, BM25 at ten candidates found 83 of 120 citation anchors and covered every evidence group for 39 of 66 components. The hybrid with the small general model found 78 and 35, and with MedCPT 69 and 29. BM25 stays the agent's retrieval. The full table is in the [evaluation report](../evaluation-report.md).
 
 ### Claude assessor
 

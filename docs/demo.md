@@ -31,7 +31,7 @@ python3 -m traceability.reviewer_app --run runs/agent-run.jsonl --reviews runs/r
 ## Steps to show
 
 1. **The shell and its components.** Pick the FEV1 summary table in the shell menu. The left pane lists every component the parser found: the title, the population label, each column and row label, and the footnotes.
-2. **One component in context.** Select the population label, Full Analysis Set. The middle pane shows what the label inherits: the endpoint, the treatment groups, and the shell and SAP versions.
+2. **One component in context.** Select the population label, Full Analysis Set. The middle pane shows what the label inherits: the endpoint, the treatment groups, and the shell and SAP versions. Open Shell page to show the original table. With an agent run, open the list of searches the agent ran.
 3. **The evidence.** The right pane shows candidate SAP passages with section and page. Two passages matter here. Section 5.3 defines the Full Analysis Set. Section 17.2.1.1 applies it to the secondary efficacy endpoints, which include FEV1. The label needs both.
 4. **A relevant mention that is not support.** Point to the Safety Analysis Set passage among the candidates. It uses similar words for a different population.
 5. **A review action.** If the proposal cites both passages, accept it. Otherwise press Correct, select the exact words in each passage, press Cite selected text, set the status, and save. Show that a correction with a status of partially supported is refused until an open question is written.

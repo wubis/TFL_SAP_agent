@@ -45,12 +45,44 @@ def query_text(component):
     return ". ".join(dict.fromkeys(part for part in parts if part))
 
 
+class MedCPT:
+    """MedCPT has one encoder for queries and another for passages. Both run locally with transformers.
+
+    The article encoder takes a title and a text. The SAP section heading stands in for the title.
+    """
+
+    def __init__(self, owner="ncbi"):
+        import torch
+        from transformers import AutoModel, AutoTokenizer
+        self.torch = torch
+        self.names = {role: f"{owner}/MedCPT-{role}-Encoder" for role in ("Query", "Article")}
+        self.tokenizers = {role: AutoTokenizer.from_pretrained(name) for role, name in self.names.items()}
+        self.models = {role: AutoModel.from_pretrained(name).eval() for role, name in self.names.items()}
+
+    def encode(self, role, inputs, max_length):
+        vectors = []
+        with self.torch.no_grad():
+            for start in range(0, len(inputs), 16):
+                batch = self.tokenizers[role](inputs[start:start + 16], truncation=True, padding=True,
+                                              return_tensors="pt", max_length=max_length)
+                vectors.extend(self.models[role](**batch).last_hidden_state[:, 0, :].tolist())
+        return vectors
+
+    def passages(self, pairs):
+        return self.encode("Article", [list(pair) for pair in pairs], 512)
+
+    def query(self, text):
+        return self.encode("Query", [text], 64)[0]
+
+
 def load_embedder(spec):
-    """Return a callable for 'fastembed:MODEL' or 'sentence-transformers:MODEL'. Both run locally."""
+    """Return an embedder for 'fastembed:MODEL', 'sentence-transformers:MODEL', or 'medcpt:OWNER'. All run locally."""
     kind, _, name = spec.partition(":")
     if not name:
-        raise ValueError("Give the embedder as LIBRARY:MODEL, for example fastembed:BAAI/bge-small-en-v1.5")
+        raise ValueError("Give the embedder as LIBRARY:MODEL, for example fastembed:BAAI/bge-small-en-v1.5 or medcpt:ncbi")
     try:
+        if kind == "medcpt":
+            return MedCPT(name)
         if kind == "fastembed":
             from fastembed import TextEmbedding
             model = TextEmbedding(name)
@@ -61,16 +93,22 @@ def load_embedder(spec):
             return lambda texts: [list(vector) for vector in model.encode(list(texts))]
     except ImportError as exc:
         raise ValueError(f"Install {kind} to use this embedder") from exc
-    raise ValueError("Unknown embedder library. Use fastembed or sentence-transformers")
+    raise ValueError("Unknown embedder library. Use fastembed, sentence-transformers, or medcpt")
 
 
 class HybridIndex:
     def __init__(self, passages, embed):
         self.bm25 = BM25(passages)
-        self.embed = embed
+        # An embedder is one callable for everything, or an object with separate passage and query encoders.
+        paired = hasattr(embed, "passages")
+        self.embed_query = embed.query if paired else (lambda text: embed([text])[0])
         self.by_id = {passage.passage_id: passage for passage in self.bm25.passages}
-        texts = [f"{passage.section or ''} {passage.text}".strip() for passage in self.bm25.passages]
-        vectors = [unit(vector) for vector in embed(texts)]
+        if paired:
+            texts = [(passage.section or "", passage.text) for passage in self.bm25.passages]
+            vectors = [unit(vector) for vector in embed.passages(texts)]
+        else:
+            texts = [f"{passage.section or ''} {passage.text}".strip() for passage in self.bm25.passages]
+            vectors = [unit(vector) for vector in embed(texts)]
         if len(vectors) != len(texts):
             raise ValueError("The embedder returned a different number of vectors than passages")
         self.dimensions = len(vectors[0])
@@ -79,7 +117,7 @@ class HybridIndex:
         self.vectors = dict(zip(self.by_id, vectors, strict=True))
 
     def dense_ranking(self, text, depth):
-        query = unit(self.embed([text])[0])
+        query = unit(self.embed_query(text))
         if len(query) != self.dimensions:
             raise ValueError(f"The query vector has {len(query)} dimensions and the passages have {self.dimensions}")
         scored = sorted(((sum(a * b for a, b in zip(query, vector, strict=True)), passage_id)

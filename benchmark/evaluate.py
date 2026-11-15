@@ -93,8 +93,9 @@ def setting_mismatches(system, settings, frozen):
     ocr = frozen["sap_text"]["ocr_for_pages_without_text"]
     if settings.get("ocr") != ocr:
         found.append(f"ocr is {settings.get('ocr')!r}, frozen is {ocr!r}")
-    if settings.get("code_commit") != frozen["code_commit"]:
-        found.append("the run was produced by code other than the frozen commit")
+    # Fingerprints compare the protected files' content. Commit IDs would differ once the frozen file is committed.
+    if not settings.get("code_fingerprint") or settings.get("code_fingerprint") != frozen["code_fingerprint"]:
+        found.append("the run was produced by code that differs from the frozen code")
     if settings.get("uncommitted_changes") is not False:
         found.append("the run was produced with uncommitted code changes")
     return found

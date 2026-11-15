@@ -40,9 +40,39 @@ python3 benchmark/evaluate.py --partition development \
   --out-json runs/evaluation.json --out-md runs/evaluation.md
 ```
 
-For the final evaluation, freeze the settings in `benchmark/evaluation-config.draft.json` into a dated file and pass it with `--partition held_out --frozen-config`. The runner refuses a held-out report unless every system has a run for every held-out family.
+Every run command writes its settings and a fingerprint of the protected code beside its results, and the report lists them.
 
-`benchmark/reviewer_effort.py --run <run> --reviews <reviews>` summarizes a review session: decisions by action, status changes, links added and removed, and time per component. `benchmark/coverage_report.py` counts what the development records cover.
+### Adjudicate unmatched links
+
+```sh
+python3 benchmark/adjudication.py export --partition development \
+  --run agent:NCT03469934:runs/agent-NCT03469934.jsonl \
+  --run llm_baseline:NCT03469934:runs/baseline-NCT03469934.jsonl \
+  --items runs/adjudication-items.csv --key runs/adjudication-key.json
+
+python3 benchmark/adjudication.py apply --items runs/adjudication-items.csv --key runs/adjudication-key.json
+```
+
+Give the adjudicator the items file only. They built none of the systems and do not see which system proposed a link. They rule equivalent, unsupported, or unsure, with a reason. A second person rules on unsure rows. Run this on development runs first, then once on held-out runs after the freeze.
+
+### Reviewer effort
+
+`benchmark/reviewer_effort.py --run <run> --reviews <reviews>` summarizes a review session: decisions by action, corrections to proposals, status changes, links added and removed, and minutes per component, split by condition when a [crossover plan](04-reviewer-interface.md#review-with-and-without-proposals) was used. `benchmark/coverage_report.py` counts what the development records cover.
+
+### Freeze and run the held-out evaluation
+
+One person does this once.
+
+```sh
+python3 benchmark/freeze_config.py --date 2026-12-01
+git add benchmark/frozen-config-2026-12-01.json
+git commit -m "Freeze evaluation configuration"
+git tag evaluation-freeze-2026-12-01
+```
+
+Produce one run per system for every held-out family from the tagged commit, using the frozen settings and the system names in the frozen file (`keyword_search`, `llm_baseline`, `agent`). Then pass every run to `benchmark/evaluate.py --partition held_out --frozen-config benchmark/frozen-config-2026-12-01.json`.
+
+Before any held-out reference is opened, the runner checks the frozen file, that the protected files are unchanged, that the commit is tagged, that runs cover exactly the frozen systems and every held-out family, and that each run's recorded settings and code fingerprint equal the frozen ones. It writes `benchmark/final-evaluation-record.json` and will not run again while that record exists. The date above is an example. The team sets the real one.
 
 The current development results, and what is still unmeasured, are in the [evaluation report draft](../evaluation-report.md). Limits are in [known limitations](../limitations.md). The [demo walkthrough](../demo.md) traces one component through review and export.
 

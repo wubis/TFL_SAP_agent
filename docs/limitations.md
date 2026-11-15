@@ -6,9 +6,9 @@ Last updated November 15, 2026.
 
 ## Not yet measured
 
-- No model-backed system has run. The Claude assessor, the tool-using agent, and the general-purpose LLM baseline are written and tested with a stand-in client. Their accuracy, cost, and run time are unknown.
-- Hybrid retrieval has not been run with an embedding model. The fusion code is tested with a toy embedder only.
-- No person has reviewed a full shell in the reviewer interface, so there is no reviewer time or correction data.
+- No language-model system has run against the API. The Claude assessor, the tool-using agent, and the general-purpose LLM baseline are written and tested with a stand-in client. Whether the live calls and the model's responses behave as intended, and the accuracy, cost, and run time, are unknown until they run.
+- No person has reviewed a full shell in the reviewer interface, so there is no reviewer time or correction data. The correct, restart, export, and score workflow has been run by script on ANB020-004.
+- No unmatched link has been adjudicated.
 - Nothing has been run on the held-out families.
 
 ## Data
@@ -31,6 +31,7 @@ Last updated November 15, 2026.
 ## Retrieval and scoring
 
 - BM25 at ten candidates covered every evidence group for 39 of 66 development components that have citations. Evidence the first retrieval misses can reach the agent only through its own lookups.
+- Hybrid retrieval did not help on development data. With a small general embedding model it covered 35 of 66 components at ten candidates, and with MedCPT 29. Two models were tried, with untuned fusion settings, on three families.
 - Adding OCR passages raised anchors found from 83 to 84 of 120 and lowered complete components from 39 to 36, because scanned passages displaced text-layer passages at the cutoff.
 - A proposed link is matched to a reference anchor at passage level: same page, and the cited 90-word window contains the anchor. A correct quotation from another sentence in that window counts as matched. A valid equivalent span on another page counts as unmatched until a person checks it.
 - Quotation checks are exact string matches after whitespace normalization. They confirm the words exist in the cited passage. They do not confirm the passage applies to the component.
@@ -39,7 +40,8 @@ Last updated November 15, 2026.
 ## Agent behavior
 
 - The agent's lookups are keyword search, read a section by heading text, and read a page. It cannot view page images, so a table that extracts badly is hard for it to use.
-- The agent and the LLM baseline may answer not found in the supplied SAP after searching. The assessor command follows the earlier instruction that keeps that status for display conventions. The team has to choose one rule before comparing them.
+- All three systems may answer not found in the supplied SAP after a documented search. The assessor sees only its retrieved candidates, so its not-found answers rest on a narrower search than the agent's or the baseline's. Each record lists the searches behind the answer.
+- The spending cap uses recorded list prices and counts cache writes at twice the input rate. It is a guard that errs high, not a bill.
 - When the agent reaches its lookup or submission limit it returns needs review with no evidence. That is safe for the reviewer and lowers measured accuracy.
 - Prompts treat shell and SAP text as data. No test has probed adversarial text inside a SAP.
 
@@ -48,6 +50,8 @@ Last updated November 15, 2026.
 - It is a single-user local page with no accounts. Two people reviewing the same file at once would interleave records.
 - Reviewer time is the time between opening a component and saving, as measured by the browser. Time away from the page is included.
 - The matrix exports as CSV and JSON. There is no PDF or Word export.
+- The shell page image is shown only for shells that sit on a single page of the supplied PDF. TARVA's shell is a Word supplement and has no image.
+- Without proposals, a reviewer can cite only passages found through the search box, which is keyword search over the same passages the agent uses.
 
 ## Environment
 

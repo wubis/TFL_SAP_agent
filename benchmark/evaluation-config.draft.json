@@ -1,5 +1,13 @@
 {
   "status": "draft",
+  "decisions": {
+    "same_model_and_effort_for_all_systems": "Confirmed by the team on 2026-11-15 for a fair comparison.",
+    "limits": "8 first candidates, 6 lookups, and 2 submissions were set as defaults before any model run. They have not been tuned on any family. If they are tuned, use development families only.",
+    "retrieval": "BM25. Hybrid retrieval with BAAI/bge-small-en-v1.5 and with MedCPT did not beat BM25 at 5 or 10 candidates on development families.",
+    "not_found_rule": "A system may answer not_found_in_supplied_sap after a documented search, and the record lists the searches.",
+    "spending_cap": "Set with --max-usd when the API key arrives.",
+    "freeze": "Run benchmark/freeze_config.py, commit the frozen file alone, and tag that commit. One person runs the held-out evaluation once."
+  },
   "note": "Settings the team must review and freeze before the held-out evaluation. Copy to a dated file once frozen and pass that file to benchmark/evaluate.py --frozen-config. Record the git commit of the code at freeze time.",
   "sap_text": {"extractor": "ghostscript txtwrite", "ocr_for_pages_without_text": true, "ocr_engine": "tesseract --psm 3 at 200 DPI"},
   "passages": {"window_words": 90, "step_words": 60},

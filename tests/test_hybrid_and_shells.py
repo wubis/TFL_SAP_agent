@@ -58,6 +58,19 @@ def test_embedder_returning_too_few_vectors_is_refused():
         HybridIndex(passages(), lambda texts: [[1.0]])
 
 
+def test_embedder_with_separate_query_and_passage_encoders():
+    class Paired:
+        def passages(self, pairs):
+            assert all(isinstance(pair, tuple) and len(pair) == 2 for pair in pairs)
+            return toy_embed([f"{section} {text}" for section, text in pairs])
+
+        def query(self, text):
+            return toy_embed([text])[0]
+
+    component = entry("ls-mean", "table_row", "Change from baseline, LS mean (SE)")["component"]
+    assert HybridIndex(passages(), Paired()).search(component, 1)[0]["passage_id"] == METHOD[0]
+
+
 def test_mismatched_embedding_dimensions_are_refused():
     ragged = lambda texts: [[1.0, 0.0]] + [[1.0, 0.0, 0.0] for _ in texts[1:]]
     with pytest.raises(ValueError, match="different or zero length"):

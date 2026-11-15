@@ -23,10 +23,10 @@ def load(name):
 
 AGENT_SETTINGS = {"system": "agent", "model": "claude-opus-5-5", "effort": "medium", "first_candidates": 8,
                   "max_lookups": 6, "max_submissions": 2, "retrieval": "BM25", "ocr": True,
-                  "code_commit": "abc123", "uncommitted_changes": False}
+                  "code_commit": "abc123", "code_fingerprint": "f1f1", "uncommitted_changes": False}
 KEYWORD_SETTINGS = {"system": "keyword_search", "method": "BM25", "top_k": 10, "ocr": True,
-                    "code_commit": "abc123", "uncommitted_changes": False}
-FROZEN = {"status": "frozen", "code_commit": "abc123", "model_identifiers": {"agent": "claude-opus-5-5"},
+                    "code_commit": "abc123", "code_fingerprint": "f1f1", "uncommitted_changes": False}
+FROZEN = {"status": "frozen", "code_commit": "abc000", "code_fingerprint": "f1f1", "model_identifiers": {"agent": "claude-opus-5-5"},
           "sap_text": {"ocr_for_pages_without_text": True},
           "systems": {"agent": {"command": "traceability.agent", "model": "claude-opus-5-5", "effort": "medium",
                                 "first_candidates": 8, "max_lookups": 6, "max_submissions": 2, "retrieval": "BM25"},
@@ -115,7 +115,8 @@ def test_held_out_gates_run_before_any_reference_is_read(workspace, monkeypatch,
     ({"model": "claude-haiku-5-5"}, "model is 'claude-haiku-5-5', frozen is 'claude-opus-5-5'"),
     ({"max_lookups": 12}, "max_lookups is 12, frozen is 6"),
     ({"ocr": False}, "ocr is False, frozen is True"),
-    ({"code_commit": "fff999"}, "code other than the frozen commit"),
+    ({"code_fingerprint": "0000"}, "differs from the frozen code"),
+    ({"code_fingerprint": None}, "differs from the frozen code"),
     ({"uncommitted_changes": True}, "uncommitted code changes"),
     ({"system": "llm_baseline"}, "the file was produced as 'llm_baseline'"),
     (None, "records no settings"),
@@ -149,7 +150,7 @@ def test_complete_held_out_run_writes_a_record_and_cannot_repeat(workspace, monk
     monkeypatch.setattr(sys, "argv", ["evaluate.py", *arguments])
     evaluate.main()
     report = capsys.readouterr().out
-    assert "held_out partition" in report and "- agent: code_commit abc123, effort medium, first_candidates 8" in report and "model claude-opus-5-5" in report
+    assert "held_out partition" in report and "- agent: code_commit abc123, code_fingerprint f1f1, effort medium" in report and "model claude-opus-5-5" in report
     record = json.loads((folder / "benchmark/final-evaluation-record.json").read_text())
     assert record["code_commit"] == "abc123"
     assert record["systems"] == {"agent": ["TEST-HELD", "TEST-HELD-2"], "keyword_search": ["TEST-HELD", "TEST-HELD-2"]}
@@ -157,17 +158,29 @@ def test_complete_held_out_run_writes_a_record_and_cannot_repeat(workspace, monk
     assert code == 1 and "already been run" in error
 
 
-def test_freeze_requires_a_clean_tree_then_detects_later_changes(tmp_path):
+def make_repo(tmp_path):
+    """A small git repository with the protected paths, a draft configuration, and a fictional held-out benchmark."""
     import subprocess
-    freezing = load("freeze_config")
     git = lambda *arguments: subprocess.run(["git", "-C", str(tmp_path), "-c", "user.name=t", "-c", "user.email=t@example.com",
                                              *arguments], check=True, capture_output=True)
-    (tmp_path / "benchmark").mkdir()
-    (tmp_path / "traceability").mkdir()
+    for folder in ("benchmark/held_out/TEST-HELD", "traceability", "data", "schemas"):
+        (tmp_path / folder).mkdir(parents=True)
     (tmp_path / "traceability/agent.py").write_text("LIMIT = 6\n")
-    (tmp_path / "benchmark/evaluation-config.draft.json").write_text(json.dumps(
-        {"status": "draft", "systems": {"agent": {"model": "claude-opus-5-5"}, "keyword_search": {"method": "BM25"}}}))
+    (tmp_path / "data/source-manifest.json").write_text(json.dumps({"partition_status": "frozen", "families": [
+        {"family_id": "TEST-HELD", "partition": "held_out", "shells": [{"document_id": "TEST-TABLE-1", "type": "table"}]}]}))
+    (tmp_path / "benchmark/held_out/TEST-HELD/reference-annotations.jsonl").write_text(
+        "".join(json.dumps(record) + "\n" for record in references().values()))
+    (tmp_path / "benchmark/evaluation-config.draft.json").write_text(json.dumps({
+        "status": "draft", "sap_text": {"ocr_for_pages_without_text": True},
+        "systems": {"agent": {"command": "traceability.agent", "model": "claude-opus-5-5", "effort": "medium",
+                              "first_candidates": 8, "max_lookups": 6, "max_submissions": 2, "retrieval": "BM25"}}}))
     git("init", "-q")
+    return git
+
+
+def test_freeze_requires_a_clean_tree_then_detects_later_changes(tmp_path):
+    freezing = load("freeze_config")
+    git = make_repo(tmp_path)
     with pytest.raises(ValueError, match="Commit or discard"):
         freezing.freeze(tmp_path, "2026-12-01")
     git("add", "-A"); git("commit", "-q", "-m", "code")
@@ -175,6 +188,7 @@ def test_freeze_requires_a_clean_tree_then_detects_later_changes(tmp_path):
     frozen = json.loads(target.read_text())
     assert frozen["status"] == "frozen" and frozen["model_identifiers"] == {"agent": "claude-opus-5-5"}
     git("add", "-A"); git("commit", "-q", "-m", "freeze")
+    assert freezing.git(tmp_path, "rev-parse", "HEAD") != frozen["code_commit"]
     assert freezing.freeze_problems(tmp_path, frozen) == ["Tag the commit that holds the frozen configuration before the held-out run"]
     git("tag", "evaluation-freeze-2026-12-01")
     assert freezing.freeze_problems(tmp_path, frozen) == []
@@ -183,6 +197,51 @@ def test_freeze_requires_a_clean_tree_then_detects_later_changes(tmp_path):
     git("commit", "-q", "-am", "tuned after the freeze"); git("tag", "later")
     assert freezing.freeze_problems(tmp_path, frozen) == ["Code, schema, conventions, or manifest changed since the freeze"]
     assert freezing.freeze_problems(tmp_path, {"status": "draft"}) == ["The configuration is not a frozen file written by benchmark/freeze_config.py"]
+
+
+def test_freeze_commit_tag_run_evaluate_sequence(tmp_path, monkeypatch, capsys, entries):
+    """The documented workflow end to end, with no gate replaced: freeze, commit the frozen file, tag, run, evaluate."""
+    from traceability.provenance import run_settings
+    evaluate, freezing = load("evaluate"), load("freeze_config")
+    monkeypatch.setattr(evaluate, "ROOT", tmp_path)
+    git = make_repo(tmp_path)
+    git("add", "-A"); git("commit", "-q", "-m", "code at the end of development")
+    target = freezing.freeze(tmp_path, "2026-12-01")
+    git("add", "-A"); git("commit", "-q", "-m", "Freeze evaluation configuration"); git("tag", "evaluation-freeze-2026-12-01")
+    frozen = json.loads(target.read_text())
+
+    def produce_run(name):
+        settings = run_settings("agent", root=tmp_path, model="claude-opus-5-5", effort="medium", first_candidates=8,
+                                max_lookups=6, max_submissions=2, retrieval="BM25", ocr=True)
+        path = tmp_path.parent / name
+        path.write_text("".join(json.dumps({**item, "run_settings": settings}) + "\n" for item in entries))
+        return settings, path
+
+    settings, run = produce_run("held-run.jsonl")
+    # The run was produced one commit after the frozen code commit, and still matches by content.
+    assert settings["code_commit"] != frozen["code_commit"] and settings["code_fingerprint"] == frozen["code_fingerprint"]
+    arguments = ["--partition", "held_out", "--frozen-config", str(target), "--run", f"agent:TEST-HELD:{run}"]
+    monkeypatch.setattr(sys, "argv", ["evaluate.py", *arguments])
+    evaluate.main()
+    assert "held_out partition" in capsys.readouterr().out
+    record = json.loads((tmp_path / "benchmark/final-evaluation-record.json").read_text())
+    assert record["code_commit"] == settings["code_commit"] and record["systems"] == {"agent": ["TEST-HELD"]}
+    code, error = run_main(evaluate, monkeypatch, capsys, *arguments)
+    assert code == 1 and "already been run" in error
+
+    # Tuning the agent after the freeze is caught twice: by the checkout check and by the run's own fingerprint.
+    (tmp_path / "benchmark/final-evaluation-record.json").unlink()
+    (tmp_path / "traceability/agent.py").write_text("LIMIT = 9\n")
+    git("commit", "-q", "-am", "tuned after the freeze"); git("tag", "later")
+    _, tuned = produce_run("tuned-run.jsonl")
+    code, error = run_main(evaluate, monkeypatch, capsys, "--partition", "held_out", "--frozen-config", str(target),
+                           "--run", f"agent:TEST-HELD:{tuned}")
+    assert code == 1 and "changed since the freeze" in error
+    monkeypatch.setattr(evaluate.freezing, "freeze_problems", lambda root, config: [])
+    code, error = run_main(evaluate, monkeypatch, capsys, "--partition", "held_out", "--frozen-config", str(target),
+                           "--run", f"agent:TEST-HELD:{tuned}")
+    assert code == 1 and "differs from the frozen code" in error
+    assert not (tmp_path / "benchmark/final-evaluation-record.json").exists()
 
 
 def test_budget_estimates_high_and_stops_at_the_cap():

@@ -27,6 +27,9 @@ The source documents are not stored here. Download each from the link in the [so
 | Reviewer interface | `python3 -m traceability.reviewer_app` | [Step 4](docs/build/04-reviewer-interface.md#run-the-reviewer-interface) |
 | Export the matrix | `python3 -m traceability.review export` | [Step 4](docs/build/04-reviewer-interface.md#run-the-reviewer-interface) |
 | Score and report | `python3 benchmark/evaluate.py` | [Step 5](docs/build/05-evaluation-and-release.md#run-the-evaluation) |
+| Blind check of unmatched links | `python3 benchmark/adjudication.py` | [Step 5](docs/build/05-evaluation-and-release.md#adjudicate-unmatched-links) |
+| Reviewer crossover plan and effort | `python3 benchmark/crossover_plan.py`, `python3 benchmark/reviewer_effort.py` | [Step 4](docs/build/04-reviewer-interface.md#review-with-and-without-proposals) |
+| Freeze before the held-out run | `python3 benchmark/freeze_config.py` | [Step 5](docs/build/05-evaluation-and-release.md#freeze-and-run-the-held-out-evaluation) |
 
 ## Documents
 
