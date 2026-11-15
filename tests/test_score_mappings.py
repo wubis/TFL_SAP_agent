@@ -1,0 +1,62 @@
+import importlib.util
+from pathlib import Path
+
+from conftest import METHOD, POPULATION, SAP_ID, SAP_VERSION, cited
+
+spec = importlib.util.spec_from_file_location(
+    "score_development_mappings", Path(__file__).resolve().parents[1] / "benchmark/score_development_mappings.py")
+scorer = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(scorer)
+
+
+def reference(key, status, evidence=(), groups=()):
+    return {"record_type": "reference_annotation", "component_id": f"TEST-TABLE-1:{key}", "sap_id": SAP_ID,
+            "sap_version": SAP_VERSION, "evidence_groups": list(groups),
+            "assessment": {"status": status, "rationale": "fictional", "evidence": list(evidence),
+                           "convention_ids": [], "open_questions": []}}
+
+
+def references():
+    population = {"passage_id": "fas-definition", "section": "4.1", "page": 4, "quote": "received at least one dose"}
+    method = {"passage_id": "ls-means", "section": "7.2", "page": 9, "quote": "Least squares means"}
+    both = [{"claim": "population and method", "alternatives": [["fas-definition", "ls-means"]]}]
+    records = [reference("ls-mean", "supported", [population, method], both),
+               reference("population", "supported", [population], [{"claim": "definition", "alternatives": [["fas-definition"]]}]),
+               reference("dash-note", "not_found_in_supplied_sap")]
+    return {record["component_id"]: record for record in records}
+
+
+def test_scores_status_links_groups_and_abstention(entries):
+    groups = scorer.score(entries, references(), {"TEST-TABLE-1": "table"})
+    result = scorer.report("all", groups["all"])
+    assert groups["table"] == groups["all"]
+    assert (result["components"], result["status_correct"]) == (3, 1)
+    assert (result["proposed_links"], result["matched_links"], result["link_precision_proxy"]) == (2, 2, 1.0)
+    assert (result["reference_anchors"], result["matched_anchors"]) == (3, 2)
+    assert (result["complete_components"], result["components_with_citations"]) == (1, 2)
+    assert (result["reference_not_found"], result["correct_abstentions"], result["deferred_without_links"]) == (1, 0, 1)
+    assert result["status_confusion_reference_to_proposed"]["supported->needs_review"] == 1
+
+
+def test_link_on_wrong_page_or_where_reference_has_none_is_not_matched(entries):
+    entries[2]["mapping"]["assessment"] = {
+        "status": "supported", "rationale": "x", "convention_ids": [], "open_questions": [],
+        "evidence": [cited(METHOD, "ANCOVA model")]}
+    entries[1]["mapping"]["assessment"] = {
+        "status": "supported", "rationale": "x", "convention_ids": [], "open_questions": [],
+        "evidence": [cited(METHOD, "using the FAS")]}
+    result = scorer.report("all", scorer.score(entries, references(), {})["all"])
+    assert (result["proposed_links"], result["matched_links"]) == (4, 2)
+    assert result["links_where_reference_has_none"] == 1
+    assert result["complete_components"] == 1
+
+
+def test_review_decisions_change_what_is_scored(entries):
+    mapping_id = entries[1]["mapping"]["mapping_id"]
+    corrected = {"status": "supported", "rationale": "x", "convention_ids": [], "open_questions": [],
+                 "evidence": [cited(POPULATION, "received at least one dose")]}
+    reviews = {mapping_id: {"record_type": "review", "component_id": entries[1]["component"]["component_id"],
+                            "mapping_id": mapping_id, "action": "correct", "corrected_assessment": corrected},
+               entries[0]["mapping"]["mapping_id"]: {"action": "reject"}}
+    result = scorer.report("all", scorer.score(entries, references(), {}, reviews)["all"])
+    assert (result["status_correct"], result["proposed_links"], result["complete_components"]) == (1, 1, 1)

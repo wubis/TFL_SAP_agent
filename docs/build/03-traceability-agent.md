@@ -70,6 +70,38 @@ The request contains `instructions`, the shell component's `kind`, `label`, and 
 
 The response uses the same assessment fields as the reviewer file, with the component ID assigned by the pipeline. The pipeline checks quotations against retrieved passages, attaches page and section metadata, and validates the status and evidence structure. A timeout, invalid response, or failed citation stops the run before mapping output. A valid response can still require human review for contextual applicability. The adapter has been exercised with a deterministic smoke-test command. Model-backed accuracy is unmeasured.
 
+### Claude assessor
+
+`traceability.claude_assessor` is an assessor command backed by the Anthropic API. Install the `anthropic` package and set `ANTHROPIC_API_KEY` in the environment. It sends the pipeline's instructions as the system prompt and the component, candidates, and conventions as the user message, and asks for a schema-constrained answer. Before answering it checks every quotation against the candidate text and the status rules the pipeline enforces. On a failed check it retries with the failures named, up to `--attempts` calls (default 2), then returns `needs_review` with empty evidence so the run continues and a reviewer takes the component.
+
+```sh
+python3 -m traceability.shell_pipeline \
+  --pdf /path/to/SAP_001.pdf --pdf-shells --ocr --assessor-timeout 300 \
+  --assessor python3 -m traceability.claude_assessor --log runs/assessor-log.jsonl > runs/pdf-run.jsonl
+```
+
+`--model` (or `TRACEABILITY_MODEL`) and `--effort` select the model and effort. `--log` appends the requested and served model, the full prompt, the raw output, check failures, and token usage for every call. Keep that file with any reported result. The command's logic is covered by tests with a stand-in client. It has yet to run against the API, so its accuracy is unmeasured.
+
+## Score mappings on development data
+
+The mapping scorer compares a run file with a development family's reference annotations. It reports status accuracy and a status confusion table, link precision and anchor recall, complete evidence-group coverage, and abstention, overall and by shell type. Pass `--reviews` to score the assessments that stand after reviewer decisions.
+
+```sh
+python3 benchmark/score_development_mappings.py \
+  --family NCT03469934 --run runs/pdf-run.jsonl
+```
+
+A run file is the shell pipeline's output. For a family without a shell parser, build one from the component inventory, the retrieval results, and the mapping output.
+
+```sh
+python3 -m traceability.review bundle \
+  --components benchmark/development/NCT03469934/components.jsonl \
+  --results /tmp/traceability-retrieval.jsonl \
+  --mappings /tmp/traceability-mappings.jsonl > runs/family-run.jsonl
+```
+
+Link precision is a passage-level proxy. A link matches when it cites the reference page and its candidate passage contains the reference anchor. An unmatched link can still be an equivalent valid span and needs a human check before it is counted as unsupported. The scorer reads development references only.
+
 ## What to build
 
 1. Build document parsers. Extract TFL components with stable IDs, source locations, and context from nearby titles, labels, and notes. Split each SAP into retrievable passages while preserving its document version, section, and page. Verify the input pairing against the manifest.

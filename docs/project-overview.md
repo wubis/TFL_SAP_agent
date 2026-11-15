@@ -39,6 +39,8 @@ The [Step 3 workflow](build/03-traceability-agent.md) searches the paired SAP wi
 
 The constructed FEV1 Markdown shell and the three authentic ANB020-004 PDF layouts run directly through parsing, retrieval, and mapping. The authentic PDF run matched all 57 benchmark component IDs, types, and labels. The pipeline accepts reviewer judgments or an assessor command and validates exact candidate quotations. Without judgments, mappings return `needs_review`. The assessor integration has been smoke-tested with a deterministic command. The reviewer interface, persistent decisions, and export remain pending.
 
+**November 15, 2026.** A [reviewer interface](build/04-reviewer-interface.md#run-the-reviewer-interface) now loads a pipeline run, saves accept, correct, and reject decisions to an append-only file, and exports the matrix as CSV or JSON. A [Claude assessor command](build/03-traceability-agent.md#claude-assessor) and a [mapping scorer](build/03-traceability-agent.md#score-mappings-on-development-data) are in place. The assessor has not been run against the API. With no judgments, the scorer shows every ANB020-004 mapping as `needs_review`, which is the starting point any assessor is measured against. `tests/` covers the review store, the web server, the assessor's checks and retry limit, and the scorer.
+
 1. **Evaluate a model-backed assessor.** Measure contextual applicability against reviewed development annotations. Compare retrieval strategies for retaining both scanned and text-layer evidence at a fixed cutoff.
 2. **Extend parsing beyond the calibration layouts.** Evaluate layouts from other development families before applying PDF extraction to held-out inputs.
 

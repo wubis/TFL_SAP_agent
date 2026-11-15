@@ -1,0 +1,307 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TFL to SAP reviewer</title>
+<style>
+  :root {
+    --bg: #f6f5f1; --panel: #ffffff; --ink: #1d1d1b; --muted: #66645e; --line: #dcd9d0;
+    --accent: #7a1f2b; --mark: #fde9a6;
+    --supported: #1f6b45; --partial: #8a5a00; --missing: #5a5f6b; --review: #7a1f2b;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #17181a; --panel: #212326; --ink: #ecebe6; --muted: #a3a199; --line: #383b40;
+            --accent: #e2909b; --mark: #6b5510;
+            --supported: #6fcf9c; --partial: #e8b85a; --missing: #aab0bd; --review: #e2909b; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.45 system-ui, sans-serif; }
+  header { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; padding: 10px 16px;
+           border-bottom: 1px solid var(--line); background: var(--panel); }
+  header h1 { font-size: 16px; margin: 0 8px 0 0; }
+  header .spacer { flex: 1; }
+  main { display: grid; grid-template-columns: minmax(240px, 300px) minmax(320px, 1fr) minmax(320px, 1fr);
+         height: calc(100vh - 54px); }
+  @media (max-width: 1000px) { main { grid-template-columns: 1fr; height: auto; } section { max-height: none; } }
+  section { overflow: auto; padding: 14px 16px; border-right: 1px solid var(--line); }
+  h2 { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 18px 0 6px; }
+  h2:first-child { margin-top: 0; }
+  select, textarea, input[type=text], button { font: inherit; color: inherit; background: var(--panel);
+    border: 1px solid var(--line); border-radius: 4px; padding: 5px 8px; }
+  textarea, input[type=text] { width: 100%; }
+  button { cursor: pointer; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: var(--panel); }
+  button:disabled { opacity: .5; cursor: default; }
+  a.button { text-decoration: none; color: inherit; border: 1px solid var(--line); border-radius: 4px; padding: 5px 8px; }
+  ul.components { list-style: none; margin: 0; padding: 0; }
+  ul.components li { padding: 7px 8px; border: 1px solid transparent; border-radius: 4px; cursor: pointer; }
+  ul.components li:hover { border-color: var(--line); }
+  ul.components li.selected { background: var(--panel); border-color: var(--accent); }
+  .kind { font-size: 11px; color: var(--muted); }
+  .chip { display: inline-block; font-size: 11px; padding: 1px 7px; border-radius: 9px; border: 1px solid currentColor;
+          margin-right: 4px; white-space: nowrap; }
+  .supported { color: var(--supported); } .partially_supported { color: var(--partial); }
+  .not_found_in_supplied_sap { color: var(--missing); } .needs_review { color: var(--review); }
+  .accept { color: var(--supported); } .correct { color: var(--partial); } .reject { color: var(--review); }
+  .pending { color: var(--muted); }
+  .label { font-size: 18px; font-weight: 600; margin: 2px 0 6px; overflow-wrap: anywhere; }
+  table.context { border-collapse: collapse; width: 100%; }
+  table.context th { text-align: left; font-weight: 500; color: var(--muted); width: 34%; vertical-align: top; padding: 2px 8px 2px 0; }
+  table.context td { padding: 2px 0; overflow-wrap: anywhere; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 9px 11px; margin: 8px 0; }
+  .card .meta { font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+  .card .text { overflow-wrap: anywhere; }
+  blockquote { margin: 4px 0 0; padding-left: 10px; border-left: 3px solid var(--accent); overflow-wrap: anywhere; }
+  mark { background: var(--mark); color: inherit; padding: 0 1px; }
+  .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 8px 0; }
+  .error { color: var(--review); min-height: 1.2em; }
+  .muted { color: var(--muted); }
+  #correction { display: none; }
+  #correction.open { display: block; }
+  ul.plain { margin: 4px 0; padding-left: 18px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>TFL to SAP reviewer</h1>
+  <label>Shell <select id="shell"></select></label>
+  <span id="summary" class="muted"></span>
+  <span class="spacer"></span>
+  <a class="button" href="/export.csv">Export matrix (CSV)</a>
+  <a class="button" href="/export.json">Export matrix (JSON)</a>
+</header>
+<main>
+  <section id="list-pane"><h2>Components</h2><ul class="components" id="components"></ul></section>
+  <section id="detail-pane"><p class="muted">Select a component.</p></section>
+  <section id="source-pane"></section>
+</main>
+<script>
+"use strict";
+const STATUSES = ["supported", "partially_supported", "not_found_in_supplied_sap", "needs_review"];
+const STATUS_TEXT = {supported: "supported", partially_supported: "partially supported",
+  not_found_in_supplied_sap: "not found in the supplied SAP", needs_review: "needs review"};
+let state = null, selected = null, opened = 0, draft = null, searchResults = [], noteText = "", lastQuery = "";
+
+function el(tag, attrs, ...children) {
+  const node = document.createElement(tag);
+  for (const [key, value] of Object.entries(attrs || {})) {
+    if (key === "class") node.className = value;
+    else if (key.startsWith("on")) node.addEventListener(key.slice(2), value);
+    else if (value !== null && value !== undefined) node.setAttribute(key, value);
+  }
+  for (const child of children.flat()) {
+    if (child === null || child === undefined) continue;
+    node.append(child instanceof Node ? child : document.createTextNode(String(child)));
+  }
+  return node;
+}
+function chip(value, text) { return el("span", {class: "chip " + value}, text || STATUS_TEXT[value] || value); }
+function actionOf(entry) { return entry.review ? entry.review.action : "pending"; }
+function inEffect(entry) {
+  return entry.review && entry.review.action === "correct" ? entry.review.corrected_assessment : entry.mapping.assessment;
+}
+async function api(path, body) {
+  const options = body ? {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body)} : {};
+  const response = await fetch(path, options);
+  const payload = await response.json();
+  if (!response.ok) throw new Error(payload.error || "Request failed");
+  return payload;
+}
+
+function renderSummary() {
+  const s = state.summary;
+  document.getElementById("summary").textContent =
+    `${s.accept} accepted, ${s.correct} corrected, ${s.reject} rejected, ${s.pending} pending`;
+}
+function renderShells() {
+  const select = document.getElementById("shell");
+  select.replaceChildren();
+  for (const [shellId, info] of Object.entries(state.shells)) {
+    const text = info.type ? `${info.type}: ${info.label} (${info.authenticity}, v${info.version})` : shellId;
+    select.append(el("option", {value: shellId}, text));
+  }
+  select.onchange = () => { selected = null; renderList(); renderDetail(); };
+}
+function renderList() {
+  const shellId = document.getElementById("shell").value;
+  const list = document.getElementById("components");
+  list.replaceChildren();
+  state.entries.forEach((entry, index) => {
+    if (entry.component.shell_id !== shellId) return;
+    const item = el("li", {class: index === selected ? "selected" : "", onclick: () => select(index)},
+      el("div", {class: "kind"}, entry.component.kind.replaceAll("_", " "), " · ", entry.component.locator),
+      el("div", {}, entry.component.label),
+      el("div", {}, chip(inEffect(entry).status), chip(actionOf(entry))));
+    list.append(item);
+  });
+}
+function select(index) {
+  selected = index; draft = null; searchResults = []; lastQuery = ""; opened = performance.now();
+  noteText = (state.entries[index].review && state.entries[index].review.note) || "";
+  api("/api/open", {mapping_id: state.entries[index].mapping.mapping_id}).catch(() => {});
+  renderList(); renderDetail();
+}
+
+function passageLookup(entry) {
+  const map = new Map();
+  for (const passage of [...entry.retrieval.candidates, ...searchResults]) map.set(passage.passage_id, passage);
+  return map;
+}
+function highlighted(text, quotes) {
+  const node = el("div", {class: "text"});
+  let spans = [];
+  for (const quote of quotes) {
+    let from = 0, at;
+    while (quote && (at = text.indexOf(quote, from)) !== -1) { spans.push([at, at + quote.length]); from = at + quote.length; }
+  }
+  spans.sort((a, b) => a[0] - b[0]);
+  let cursor = 0;
+  for (const [start, end] of spans) {
+    if (start < cursor) continue;
+    node.append(text.slice(cursor, start), el("mark", {}, text.slice(start, end)));
+    cursor = end;
+  }
+  node.append(text.slice(cursor));
+  return node;
+}
+function passageCard(entry, passage, rank, quotes) {
+  const textNode = highlighted(passage.text, quotes);
+  const meta = `${rank} · SAP v${entry.mapping.sap_version} · ${passage.section || "Unidentified section"} · ` +
+    `SAP page ${passage.page} (PDF page ${passage.pdf_page}) · ${passage.extraction === "ocr" ? "OCR text" : "PDF text"}`;
+  const cite = el("button", {onclick: () => {
+    const selection = window.getSelection();
+    const quote = selection.toString().replace(/\s+/g, " ").trim();
+    if (!quote || !textNode.contains(selection.anchorNode) || !textNode.contains(selection.focusNode)) {
+      setError("Select the exact words to quote inside this passage first."); return;
+    }
+    if (!passage.text.includes(quote)) { setError("The selection must be one continuous stretch of this passage."); return; }
+    startDraft(entry);
+    draft.evidence.push({passage_id: passage.passage_id, quote});
+    renderDetail();
+  }}, "Cite selected text");
+  return el("div", {class: "card"}, el("div", {class: "meta"}, meta), textNode, el("div", {class: "row"}, cite));
+}
+
+function startDraft(entry) {
+  if (draft) return;
+  const base = inEffect(entry);
+  draft = {status: base.status, rationale: base.rationale, open_questions: base.open_questions.join("\n"),
+           convention_ids: [...base.convention_ids],
+           evidence: base.evidence.map(item => ({passage_id: item.passage_id, quote: item.quote}))};
+}
+function setError(message) { const node = document.getElementById("error"); if (node) node.textContent = message || ""; }
+
+async function save(action) {
+  const entry = state.entries[selected];
+  const body = {mapping_id: entry.mapping.mapping_id, action, note: noteText,
+                elapsed_seconds: Math.round((performance.now() - opened) / 100) / 10};
+  if (action === "correct") {
+    body.correction = {status: draft.status, rationale: draft.rationale,
+      open_questions: draft.open_questions.split("\n").map(line => line.trim()).filter(Boolean),
+      convention_ids: draft.convention_ids, evidence: draft.evidence};
+  }
+  try {
+    const result = await api("/api/review", body);
+    entry.review = result.review; state.summary = result.summary; draft = null;
+    renderSummary(); renderList(); renderDetail();
+  } catch (error) { setError(error.message); }
+}
+
+function renderDetail() {
+  const detail = document.getElementById("detail-pane"), source = document.getElementById("source-pane");
+  if (selected === null) {
+    detail.replaceChildren(el("p", {class: "muted"}, "Select a component.")); source.replaceChildren(); return;
+  }
+  const entry = state.entries[selected], component = entry.component, context = component.context;
+  const assessment = inEffect(entry), proposal = entry.mapping.assessment, passages = passageLookup(entry);
+  const shown = draft || assessment;
+  const contextRows = [["Population", context.population], ["Endpoint", context.endpoint], ["Visit", context.visit],
+    ["Treatment groups", context.treatment_groups.join("; ")], ["Nearby labels", context.surrounding_labels.join("; ")],
+    ["Shell", `${component.shell_id}, version ${component.shell_version}`], ["Location", component.locator],
+    ["SAP", `${entry.mapping.sap_id}, version ${entry.mapping.sap_version}`]];
+
+  const evidenceList = shown.evidence.length
+    ? shown.evidence.map((item, index) => {
+        const passage = passages.get(item.passage_id) || item;
+        const where = `${index + 1}. SAP v${entry.mapping.sap_version} · ${item.section || passage.section || "Unidentified section"} · SAP page ${item.page || passage.page}`;
+        const remove = draft ? el("button", {onclick: () => { draft.evidence.splice(index, 1); renderDetail(); }}, "Remove") : null;
+        return el("div", {class: "card"}, el("div", {class: "meta"}, where), el("blockquote", {}, item.quote), remove ? el("div", {class: "row"}, remove) : null);
+      })
+    : [el("p", {class: "muted"}, "No SAP passage is linked.")];
+
+  const proposalBlock = [
+    el("h2", {}, entry.review && entry.review.action === "correct" ? "Agent proposal (kept for comparison)" : "Agent proposal"),
+    el("div", {}, chip(proposal.status)),
+    el("p", {}, proposal.rationale),
+    proposal.open_questions.length ? el("ul", {class: "plain"}, proposal.open_questions.map(q => el("li", {}, q))) : null,
+    proposal.convention_ids.length ? el("p", {}, "Display convention, kept apart from SAP evidence: ", proposal.convention_ids.join(", ")) : null,
+  ];
+  const correctedBlock = entry.review && entry.review.action === "correct" && !draft ? [
+    el("h2", {}, "Reviewer correction"), el("div", {}, chip(assessment.status)), el("p", {}, assessment.rationale),
+    assessment.open_questions.length ? el("ul", {class: "plain"}, assessment.open_questions.map(q => el("li", {}, q))) : null,
+    assessment.convention_ids.length ? el("p", {}, "Display convention: ", assessment.convention_ids.join(", ")) : null,
+  ] : [];
+
+  const form = el("div", {id: "correction", class: draft ? "open card" : "card"});
+  if (draft) {
+    const status = el("select", {onchange: event => { draft.status = event.target.value; }},
+      STATUSES.map(value => el("option", {value, selected: value === draft.status ? "" : null}, STATUS_TEXT[value])));
+    const rationale = el("textarea", {rows: 3, oninput: event => { draft.rationale = event.target.value; }}, draft.rationale);
+    const questions = el("textarea", {rows: 2, placeholder: "One question per line. Required for partially supported and needs review.",
+      oninput: event => { draft.open_questions = event.target.value; }}, draft.open_questions);
+    const conventions = entry.retrieval.constructed_shell ? state.conventions.map(rule =>
+      el("label", {title: rule.rule}, el("input", {type: "checkbox", checked: draft.convention_ids.includes(rule.convention_id) ? "" : null,
+        onchange: event => { draft.convention_ids = event.target.checked
+          ? [...draft.convention_ids, rule.convention_id] : draft.convention_ids.filter(id => id !== rule.convention_id); }}),
+        " ", rule.convention_id)) : [];
+    form.append(el("h2", {}, "Correction"), el("label", {}, "Status ", status), el("div", {class: "row"}),
+      el("label", {}, "Rationale", rationale), el("label", {}, "Open questions", questions),
+      conventions.length ? el("div", {class: "row"}, "Display conventions: ", conventions) : null,
+      el("p", {class: "muted"}, "To add evidence, select the exact words in a passage on the right and press Cite selected text."),
+      el("div", {class: "row"}, el("button", {class: "primary", onclick: () => save("correct")}, "Save correction"),
+        el("button", {onclick: () => { draft = null; renderDetail(); }}, "Cancel")));
+  }
+
+  const note = el("textarea", {id: "note", rows: 2, placeholder: "Optional reviewer note",
+    oninput: event => { noteText = event.target.value; }}, noteText);
+  detail.replaceChildren(...[
+    el("div", {class: "kind"}, component.kind.replaceAll("_", " ")), el("div", {class: "label"}, component.label),
+    el("div", {}, "Review: ", chip(actionOf(entry))),
+    el("h2", {}, "Component in context"),
+    el("table", {class: "context"}, contextRows.map(([name, value]) => el("tr", {}, el("th", {}, name), el("td", {}, value || "not stated")))),
+    ...proposalBlock, ...correctedBlock,
+    el("h2", {}, draft ? "Evidence in the correction" : "Linked SAP evidence"), ...evidenceList,
+    form,
+    el("h2", {}, "Decision"), note,
+    el("div", {class: "row"},
+      el("button", {class: "primary", disabled: draft ? "" : null, onclick: () => save("accept")}, "Accept"),
+      el("button", {disabled: draft ? "" : null, onclick: () => { startDraft(entry); renderDetail(); }}, "Correct"),
+      el("button", {disabled: draft ? "" : null, onclick: () => save("reject")}, "Reject"),
+      el("button", {disabled: draft ? "" : null, onclick: () => save("pending")}, "Back to pending")),
+    el("div", {class: "error", id: "error"})].filter(Boolean));
+
+  const quotesFor = passage => shown.evidence.filter(item => item.passage_id === passage.passage_id).map(item => item.quote);
+  const children = [el("h2", {}, "Candidate SAP passages")];
+  if (!entry.retrieval.candidates.length) children.push(el("p", {class: "muted"}, "Retrieval returned no passage."));
+  entry.retrieval.candidates.forEach((passage, index) =>
+    children.push(passageCard(entry, passage, `Rank ${index + 1}`, quotesFor(passage))));
+  if (state.search_enabled) {
+    const box = el("input", {type: "text", id: "query", placeholder: "Search the whole paired SAP", value: lastQuery});
+    const run = async () => {
+      lastQuery = box.value;
+      try { searchResults = (await api("/api/search?q=" + encodeURIComponent(box.value))).passages; renderDetail(); }
+      catch (error) { setError(error.message); }
+    };
+    box.addEventListener("keydown", event => { if (event.key === "Enter") run(); });
+    children.push(el("h2", {}, "Search the SAP"), el("div", {class: "row"}, box, el("button", {onclick: run}, "Search")));
+    searchResults.forEach((passage, index) => children.push(passageCard(entry, passage, `Search result ${index + 1}`, quotesFor(passage))));
+  }
+  source.replaceChildren(...children);
+}
+
+api("/api/state").then(payload => { state = payload; renderSummary(); renderShells(); renderList(); renderDetail(); })
+  .catch(error => { document.getElementById("detail-pane").textContent = error.message; });
+</script>
+</body>
+</html>
