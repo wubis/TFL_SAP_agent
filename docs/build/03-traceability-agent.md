@@ -70,6 +70,77 @@ The request contains `instructions`, the shell component's `kind`, `label`, and 
 
 The response uses the same assessment fields as the reviewer file, with the component ID assigned by the pipeline. The pipeline checks quotations against retrieved passages, attaches page and section metadata, and validates the status and evidence structure. A timeout, invalid response, or failed citation stops the run before mapping output. A valid response can still require human review for contextual applicability. The adapter has been exercised with a deterministic smoke-test command. Model-backed accuracy is unmeasured.
 
+## Parse the development shells
+
+`traceability.dev_shells` reads the registered authentic shells of each development family and prints component records. ANB020-004 uses the existing PDF readers. APRIL's Appendix Table 3 is read from the SAP PDF. TARVA's Table S4 is read from the supplement, passed with `--shell-file`.
+
+```sh
+python3 -m traceability.dev_shells --family ISRCTN12368131 --pdf /path/to/april-sap.pdf > runs/april-components.jsonl
+
+python3 -m traceability.dev_shells --family NCT02128555 --pdf /path/to/tarva-sap.pdf \
+  --shell-file /path/to/13063_2019_3973_MOESM1_ESM.docx > runs/tarva-components.jsonl
+```
+
+Both new readers reproduce their benchmark inventories exactly: 11 of 11 APRIL components and 7 of 7 TARVA components match on ID, kind, label, and context. Each reader is tied to its registered layout and the slice the manifest selects. Set `TRACEABILITY_SOURCES` to a folder holding the original files to run the reader tests.
+
+## Run the agent
+
+`traceability.agent` is the tool-using agent. Code retrieves the first candidates with BM25. The model then chooses among three lookups, `search_sap`, `read_section`, and `read_page`, and finishes with `submit_assessment`. Code runs each lookup, checks every quotation against the passages the model was shown, and enforces the limits: 6 lookups and 2 submission attempts per component by default. When a limit is reached without a verifiable answer, the component is recorded as `needs_review` with an open question, so the loop always ends with a record.
+
+```sh
+python3 -m traceability.agent --family NCT03469934 --pdf /path/to/SAP_001.pdf --ocr \
+  --components runs/anb-components.jsonl \
+  --log runs/agent-log.jsonl --summary runs/agent-summary.json > runs/agent-run.jsonl
+```
+
+Use `--limit 3` for a trial run and `--max-usd` to stop before the next component once estimated spend reaches a cap. The output is a run file with the passages the model saw, the validated mapping, a trace of its lookups, and the run's settings with a fingerprint of the code that produced it, so the reviewer interface and the scorers read it directly.
+
+The agent may answer `not_found_in_supplied_sap` after a documented search. It must run at least one lookup first, and code writes the list of searches into the rationale. A component that rests only on a display convention takes the same status with the convention ID and no SAP passage. The assessor command and the LLM baseline follow the same rule, and each names the search behind a not-found answer. Its loop, limits, and quotation checks are covered by tests with a stand-in client and its lookups were exercised on the real ANB020-004 SAP. It has yet to run against the API.
+
+## Hybrid retrieval
+
+`traceability.hybrid` combines the BM25 ranking with an embedding ranking by reciprocal rank fusion and writes results in the same shape as the BM25 command, so the same scorers compare the two. Pass a local model with `--embedder`: `fastembed:BAAI/bge-small-en-v1.5` for a small general model (needs `fastembed`), or `medcpt:ncbi` for MedCPT's query and article encoders (needs `torch` and `transformers`).
+
+```sh
+python3 -m traceability.hybrid --family NCT03469934 --pdf /path/to/SAP_001.pdf \
+  --components benchmark/development/NCT03469934/components.jsonl \
+  --embedder fastembed:BAAI/bge-small-en-v1.5 --top-k 10 > runs/hybrid-NCT03469934.jsonl
+```
+
+On the three development families, text layer only, BM25 at ten candidates found 83 of 120 citation anchors and covered every evidence group for 39 of 66 components. The hybrid with the small general model found 78 and 35, and with MedCPT 69 and 29. BM25 stays the agent's retrieval. The full table is in the [evaluation report](../evaluation-report.md).
+
+### Claude assessor
+
+`traceability.claude_assessor` is an assessor command backed by the Anthropic API. Install the `anthropic` package and set `ANTHROPIC_API_KEY` in the environment. It sends the pipeline's instructions as the system prompt and the component, candidates, and conventions as the user message, and asks for a schema-constrained answer. Before answering it checks every quotation against the candidate text and the status rules the pipeline enforces. On a failed check it retries with the failures named, up to `--attempts` calls (default 2), then returns `needs_review` with empty evidence so the run continues and a reviewer takes the component.
+
+```sh
+python3 -m traceability.shell_pipeline \
+  --pdf /path/to/SAP_001.pdf --pdf-shells --ocr --assessor-timeout 300 \
+  --assessor python3 -m traceability.claude_assessor --log runs/assessor-log.jsonl > runs/pdf-run.jsonl
+```
+
+`--model` (or `TRACEABILITY_MODEL`) and `--effort` select the model and effort. `--log` appends the requested and served model, the full prompt, the raw output, check failures, and token usage for every call. Keep that file with any reported result. The command's logic is covered by tests with a stand-in client. It has yet to run against the API, so its accuracy is unmeasured.
+
+## Score mappings on development data
+
+The mapping scorer compares a run file with a development family's reference annotations. It reports status accuracy and a status confusion table, link precision and anchor recall, complete evidence-group coverage, and abstention, overall and by shell type. Pass `--reviews` to score the assessments that stand after reviewer decisions.
+
+```sh
+python3 benchmark/score_development_mappings.py \
+  --family NCT03469934 --run runs/pdf-run.jsonl
+```
+
+A run file is the shell pipeline's output. For a family without a shell parser, build one from the component inventory, the retrieval results, and the mapping output.
+
+```sh
+python3 -m traceability.review bundle \
+  --components benchmark/development/NCT03469934/components.jsonl \
+  --results /tmp/traceability-retrieval.jsonl \
+  --mappings /tmp/traceability-mappings.jsonl > runs/family-run.jsonl
+```
+
+Link precision is a passage-level proxy. A link matches when it cites the reference page and its candidate passage contains the reference anchor. An unmatched link can still be an equivalent valid span and needs a human check before it is counted as unsupported. The scorer reads development references only.
+
 ## What to build
 
 1. Build document parsers. Extract TFL components with stable IDs, source locations, and context from nearby titles, labels, and notes. Split each SAP into retrievable passages while preserving its document version, section, and page. Verify the input pairing against the manifest.

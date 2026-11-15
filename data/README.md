@@ -15,6 +15,16 @@ The six-family split was frozen on November 13, 2026. Each family has a public S
 
 MARCH-PFIC's paired SAP version is inferred from the shared protocol amendment, project code, bundle, and matching planned outputs. The two shell documents have their own version dates. [MARCH-PFIC SAP and shells](https://cdn.clinicaltrials.gov/large-docs/30/NCT03905330/SAP_001.pdf)
 
+## Adding a family after the freeze
+
+Six families is the final count unless a new family fills a gap in coverage. The proposal asks for 6 to 8. If a family is added, its partition is fixed by this rule before anyone opens its documents:
+
+- If two families are added, one goes to each partition.
+- If one is added and nobody who builds the agent has read it, it goes to held out, since that is the main result.
+- If a builder has already read it, it goes to development.
+
+Record who had read the documents, and the date, in the family's manifest notes.
+
 ## Calibration family
 
 Start with **NCT03469934 (ANB020-004)**. It has a continuous FEV1 summary table, a mean eosinophil profile figure, and a subject-level spirometry listing. The PDF's front page ties the three shell documents to the same SAP date. The table and listing share an endpoint, while the figure exercises a different analysis population. The manifest records both section-local and printed CSR page numbers because numbering restarts in each section. [ClinicalTrials.gov statistical methods bundle](https://cdn.clinicaltrials.gov/large-docs/34/NCT03469934/SAP_001.pdf)
@@ -25,4 +35,4 @@ For any bundle that contains both SAP text and shell pages, put the selected she
 
 ## Annotation handoff
 
-The [benchmark](../benchmark/README.md) covers all six selected families. One [constructed FEV1 challenge](shells/anb020-004-fev1-challenge.md) stays with ANB020-004 in development. Team ownership, any additional review requirements, and demo format still need to be recorded.
+The [benchmark](../benchmark/README.md) covers all six selected families. One [constructed FEV1 challenge](shells/anb020-004-fev1-challenge.md) stays with ANB020-004 in development. Each family's manifest entry has an `annotation_review` record. A second teammate who did not write the annotations signs off each family with `python3 benchmark/sign_off.py`, and a third person or the group settles disagreements. No family is signed off yet. The acceptable mix of authentic and constructed shells has not been confirmed with the TA.

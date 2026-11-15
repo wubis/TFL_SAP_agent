@@ -1,0 +1,6 @@
+jsonschema==4.26.0
+anthropic==2.8.0
+pytest==9.2.0
+# Optional, for hybrid retrieval with a local embedding model:
+# fastembed==0.9.1            (fastembed:BAAI/bge-small-en-v1.5)
+# torch==2.15.0 transformers==5.23.0   (medcpt:ncbi)

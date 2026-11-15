@@ -192,8 +192,10 @@ def main():
     args = parser.parse_args()
     manifest = json.loads((ROOT / "data/source-manifest.json").read_text(encoding="utf-8"))
     try:
+        from traceability.provenance import run_settings
+        settings = run_settings("keyword_search", method="BM25", top_k=args.top_k, ocr=args.ocr)
         for result in retrieve(manifest, args.family, args.pdf, args.components, args.top_k, ocr=args.ocr):
-            print(json.dumps(result, ensure_ascii=False))
+            print(json.dumps({**result, "run_settings": settings}, ensure_ascii=False))
     except (OSError, ValueError, subprocess.CalledProcessError) as exc:
         parser.exit(1, f"{exc}\n")
 
