@@ -15,5 +15,5 @@ def test_agent_package_never_names_benchmark_answer_files():
 def test_only_scoring_scripts_open_reference_annotations():
     readers = sorted(path.name for path in (ROOT / "benchmark").glob("*.py")
                      if "reference-annotations" in path.read_text(encoding="utf-8"))
-    assert readers == ["adjudication.py", "coverage_report.py", "evaluate.py", "score_development_mappings.py",
+    assert readers == ["adjudication.py", "challenge_tags.py", "coverage_report.py", "evaluate.py", "score_development_mappings.py",
                        "score_development_retrieval.py", "validate_calibration.py"]

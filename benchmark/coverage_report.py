@@ -1,7 +1,8 @@
 """Report what the development benchmark covers: shell types, component kinds, statuses, and challenge cases.
 
-Counts only what the records state. Paraphrased labels and similar-population traps are not tagged
-in the records, so they cannot be counted here.
+Challenge cases are counted from each record's challenge_cases tags. Five tags follow from the
+record and are filled by benchmark/challenge_tags.py. Three need an annotator and read zero until
+the records are tagged.
 
     python3 benchmark/coverage_report.py
 """
@@ -16,6 +17,10 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from traceability.review import read_jsonl  # noqa: E402
+
+CASES = ("paraphrased_label", "similar_analysis_different_population", "general_convention_with_exception",
+         "unsupported_footnote", "incomplete_specification", "evidence_across_multiple_sections",
+         "alternative_valid_passages", "convention_only_component")
 
 
 def coverage(manifest):
@@ -37,21 +42,23 @@ def coverage(manifest):
             tally[f"authenticity:{shell['authenticity']}"] += 1
             tally[f"kind:{component['kind']}"] += 1
             tally[f"status:{assessment['status']}"] += 1
-            tally["case:multi_passage_support"] += any(
+            tally["records_with_challenge_tags"] += "challenge_cases" in annotation
+            for tag in annotation.get("challenge_cases", []):
+                tally[f"case:{tag}"] += 1
+            tally["feature:multi_passage_support"] += any(
                 len(option) > 1 for group in annotation["evidence_groups"] for option in group["alternatives"]) \
                 or len(annotation["evidence_groups"]) > 1
-            tally["case:multi_section_evidence"] += len({passage["section"] for passage in evidence}) > 1
-            tally["case:alternative_passages_accepted"] += any(len(group["alternatives"]) > 1 for group in annotation["evidence_groups"])
-            tally["case:convention_only"] += bool(assessment["convention_ids"])
-            tally["case:unsupported_footnote"] += component["kind"] == "footnote" and assessment["status"] == "not_found_in_supplied_sap"
-            tally["case:incomplete_specification"] += assessment["status"] == "partially_supported"
-            tally["case:ambiguity_or_contradiction"] += assessment["status"] == "needs_review"
-            tally["case:scanned_evidence"] += any(passage.get("extraction") == "ocr" for passage in evidence)
+            tally["feature:ambiguity_or_contradiction"] += assessment["status"] == "needs_review"
+            tally["feature:scanned_evidence"] += any(passage.get("extraction") == "ocr" for passage in evidence)
         by_family[family["family_id"]] = dict(sorted(tally.items()))
         totals.update(tally)
+    for tag in CASES:
+        totals.setdefault(f"case:{tag}", 0)
+    thin = sorted(tag for tag in CASES if totals[f"case:{tag}"] <= 2)
     return {"partition": "development", "total": dict(sorted(totals.items())), "by_family": by_family,
-            "not_countable_from_records": ["paraphrased labels", "similar analyses for different populations",
-                                           "general conventions with endpoint-specific exceptions"]}
+            "cases_with_two_or_fewer_records": thin,
+            "note": "The three tags an annotator sets read zero until annotators tag the records. "
+                    "Zero there means not yet tagged, not absent."}
 
 
 def main():

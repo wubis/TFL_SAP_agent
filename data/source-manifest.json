@@ -91,7 +91,13 @@
         }
       ],
       "notes": "The bundle inventory lists the SAP and all three shell documents together, dated 18 December 2018. The later ACQ-5 file note is outside the selected SAP evidence.",
-      "partition": "development"
+      "partition": "development",
+      "annotation_review": {
+        "annotated_by": "AI annotator, with a source audit",
+        "signed_off_by": null,
+        "signed_off_on": null,
+        "disagreements_settled_by": null
+      }
     },
     {
       "family_id": "NCT02128555",
@@ -108,7 +114,10 @@
         "date": "2020-02-18",
         "url": "https://discovery.ucl.ac.uk/id/eprint/10092165/1/s13063-019-3973-4.pdf",
         "locator": "Statistical analyses and Supplementary information",
-        "pdf_pages": [1, 9],
+        "pdf_pages": [
+          1,
+          9
+        ],
         "source_pdf_sha256": "909c3a44b32133af1faeb5d2a2b539265c0c5fad2fe1ad1bd40473bc23e40263",
         "redistribution": "CC BY 4.0 (published article)"
       },
@@ -128,7 +137,13 @@
         }
       ],
       "notes": "The version of record explicitly identifies Additional file 1 as its dummy tables. The supplement shows blank arm-by-visit mean and SD cells.",
-      "partition": "development"
+      "partition": "development",
+      "annotation_review": {
+        "annotated_by": "AI annotator, with a source audit",
+        "signed_off_by": null,
+        "signed_off_on": null,
+        "disagreements_settled_by": null
+      }
     },
     {
       "family_id": "ISRCTN12368131",
@@ -172,7 +187,13 @@
       ],
       "notes": "The dummy table is embedded in the final signed SAP. The date is the last of the final approvals on the cover.",
       "partition": "development",
-      "source_status": "verified_pair"
+      "source_status": "verified_pair",
+      "annotation_review": {
+        "annotated_by": "AI annotator, with a source audit",
+        "signed_off_by": null,
+        "signed_off_on": null,
+        "disagreements_settled_by": null
+      }
     },
     {
       "family_id": "NCT03905330",
@@ -231,7 +252,13 @@
         }
       ],
       "notes": "The public filing bundles the SAP, table shells, and listing shells. The three covers match protocol amendment 4 and project code MIRU8967. The SAP lists the selected table by ID, and the listing uses its corresponding total serum bile acid endpoint. The paired SAP version is inferred from these corroborating records. The shell covers provide their own dates and versions.",
-      "partition": "held_out"
+      "partition": "held_out",
+      "annotation_review": {
+        "annotated_by": "AI annotator, with a source audit",
+        "signed_off_by": null,
+        "signed_off_on": null,
+        "disagreements_settled_by": null
+      }
     },
     {
       "family_id": "ISRCTN11079129",
@@ -291,7 +318,13 @@
         }
       ],
       "notes": "Table and figure are embedded in the same versioned SAP. Bound the SAP evidence to the analysis text and keep Appendix A display templates on the shell side.",
-      "partition": "held_out"
+      "partition": "held_out",
+      "annotation_review": {
+        "annotated_by": "AI annotator, with a source audit",
+        "signed_off_by": null,
+        "signed_off_on": null,
+        "disagreements_settled_by": null
+      }
     },
     {
       "family_id": "NCT03975894",
@@ -307,7 +340,10 @@
         "date": "2023-03-24",
         "url": "https://link.springer.com/content/pdf/10.1186/s13063-023-07235-x.pdf",
         "locator": "Statistical analysis plan and Neonatal outcomes sections of the version of record",
-        "pdf_pages": [1, 6],
+        "pdf_pages": [
+          1,
+          6
+        ],
         "source_pdf_sha256": "e36d951f031585b0af0506fb366a42fc2f54e403475ca5a1f05408ccd89f5631",
         "redistribution": "CC BY 4.0 (published article)"
       },
@@ -328,7 +364,13 @@
       ],
       "notes": "The version of record links the original dummy table supplement. The birthweight row specifies mean and SD by arm without observations.",
       "partition": "held_out",
-      "source_status": "verified_pair"
+      "source_status": "verified_pair",
+      "annotation_review": {
+        "annotated_by": "AI annotator, with a source audit",
+        "signed_off_by": null,
+        "signed_off_on": null,
+        "disagreements_settled_by": null
+      }
     }
   ],
   "partition_frozen_on": "2026-11-13",

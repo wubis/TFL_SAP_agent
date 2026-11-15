@@ -39,6 +39,25 @@ Use a reference `evidence_groups` entry for each substantiated claim or conflict
 
 The [display convention list](display-conventions.json) establishes an em dash for inapplicable cells in the constructed challenge fixture. A convention applies only within its recorded scope. Record applicable IDs in `convention_ids`. A convention-only component uses `not_found_in_supplied_sap` and has no SAP evidence. Where the SAP specifies a display detail, assess it using the SAP passage.
 
+## Tag challenge cases
+
+Tag each reference record at annotation time with the challenge cases it exercises, in the optional `challenge_cases` list. Use only these values, taken from the proposal. A record can carry several or none.
+
+| Tag | Use it when | Who sets it |
+| --- | --- | --- |
+| `paraphrased_label` | The shell label and the supporting SAP text use different wording for the same thing, such as an abbreviation against the full term. | Annotator |
+| `similar_analysis_different_population` | The SAP describes the same or a similar analysis for another population, endpoint, or visit, so a passage could be mistaken for support. | Annotator |
+| `general_convention_with_exception` | A general rule would apply to the component and an endpoint-specific rule overrides or qualifies it. | Annotator |
+| `unsupported_footnote` | A footnote has no supporting passage in the supplied SAP and rests on no display convention. | Derived from the record |
+| `incomplete_specification` | The status is `partially_supported`. | Derived from the record |
+| `evidence_across_multiple_sections` | The evidence comes from more than one SAP section. | Derived from the record |
+| `alternative_valid_passages` | An evidence group lists more than one acceptable alternative. | Derived from the record |
+| `convention_only_component` | The component rests only on an approved display convention. | Derived from the record |
+
+`python3 benchmark/challenge_tags.py --partition development --write` fills the five derived tags and keeps the three an annotator set. Without the annotator's tags, results for those three cases cannot be reported. The scorer reports every measure by tag.
+
+Constructed shells may be added for a challenge case with no records or very few. Count coverage first with `benchmark/coverage_report.py`. Write each one to a real SAP in a development family, label it `constructed`, and write it before looking at any agent output, so it is not shaped by where the agent fails. Add one to a held-out family only when a case has no records at all there. It must be written by someone who is not tuning the agent, before any held-out run.
+
 ## Review protocol
 
-For calibration, use a second annotator who independently labels the same components before seeing the drafts. Compare component boundaries, citation spans, status, and which evidence is required. Resolve disagreements against the selected SAP and document the resolution in `review_note`. For other records, document the source audit or independent review performed. Keep any team or TA sign-off requirement explicit. Track benchmark coverage of paraphrases, similar populations, endpoint-specific exceptions, multi-section support, convention-only components, unsupported footnotes, and incomplete specifications.
+For calibration, use a second annotator who independently labels the same components before seeing the drafts. Compare component boundaries, citation spans, status, and which evidence is required. Resolve disagreements against the selected SAP and document the resolution in `review_note`. For other records, document the source audit or independent review performed. A second teammate who did not write the annotations signs off each family. A third person, or the group, settles disagreements. Record the names and dates in the source manifest with `python3 benchmark/sign_off.py`. The proposal asks for reviewed reference links, so a single unreviewed pass does not meet it. The held-out evaluation refuses to run until every held-out family is signed off. Track benchmark coverage of paraphrases, similar populations, endpoint-specific exceptions, multi-section support, convention-only components, unsupported footnotes, and incomplete specifications.

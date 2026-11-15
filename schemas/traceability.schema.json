@@ -143,6 +143,14 @@
         "assessment": { "$ref": "#/$defs/assessment" },
         "evidence_groups": { "type": "array", "items": { "$ref": "#/$defs/evidenceGroup" } },
         "review_state": { "enum": ["draft", "reviewed"] },
+        "challenge_cases": {
+          "description": "Challenge cases this component exercises, tagged by the annotator from the proposal's list. Omitted until tagged.",
+          "type": "array",
+          "items": {
+            "enum": ["paraphrased_label", "similar_analysis_different_population", "general_convention_with_exception", "unsupported_footnote", "incomplete_specification", "evidence_across_multiple_sections", "alternative_valid_passages", "convention_only_component"]
+          },
+          "uniqueItems": true
+        },
         "review_note": { "$ref": "#/$defs/text" }
       },
       "if": { "properties": { "review_state": { "const": "reviewed" } } },
