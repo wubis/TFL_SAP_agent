@@ -21,6 +21,18 @@ def load(name):
     return module
 
 
+AGENT_SETTINGS = {"system": "agent", "model": "claude-opus-5-5", "effort": "medium", "first_candidates": 8,
+                  "max_lookups": 6, "max_submissions": 2, "retrieval": "BM25", "ocr": True,
+                  "code_commit": "abc123", "uncommitted_changes": False}
+KEYWORD_SETTINGS = {"system": "keyword_search", "method": "BM25", "top_k": 10, "ocr": True,
+                    "code_commit": "abc123", "uncommitted_changes": False}
+FROZEN = {"status": "frozen", "code_commit": "abc123", "model_identifiers": {"agent": "claude-opus-5-5"},
+          "sap_text": {"ocr_for_pages_without_text": True},
+          "systems": {"agent": {"command": "traceability.agent", "model": "claude-opus-5-5", "effort": "medium",
+                                "first_candidates": 8, "max_lookups": 6, "max_submissions": 2, "retrieval": "BM25"},
+                      "keyword_search": {"command": "traceability.retrieval", "method": "BM25", "top_k": [1, 5, 10]}}}
+
+
 @pytest.fixture
 def workspace(tmp_path, monkeypatch, entries):
     evaluate = load("evaluate")
@@ -36,9 +48,10 @@ def workspace(tmp_path, monkeypatch, entries):
         folder.mkdir(parents=True)
         (folder / "reference-annotations.jsonl").write_text("".join(json.dumps(r) + "\n" for r in references().values()))
     run = tmp_path / "run.jsonl"
-    run.write_text("".join(json.dumps(item) + "\n" for item in entries))
+    run.write_text("".join(json.dumps({**item, "run_settings": AGENT_SETTINGS, "agent": {"served_models": ["claude-opus-5-5"]}}) + "\n"
+                           for item in entries))
     saved = tmp_path / "retrieval.jsonl"
-    saved.write_text("".join(json.dumps({**item["retrieval"]}) + "\n" for item in entries))
+    saved.write_text("".join(json.dumps({**item["retrieval"], "run_settings": KEYWORD_SETTINGS}) + "\n" for item in entries))
     monkeypatch.setattr(evaluate, "ROOT", tmp_path)
     return evaluate, manifest, run, saved, tmp_path
 
@@ -67,33 +80,195 @@ def run_main(evaluate, monkeypatch, capsys, *arguments):
     return stop.value.code, capsys.readouterr().err
 
 
-def test_held_out_needs_a_frozen_config_and_every_family(workspace, monkeypatch, capsys):
-    evaluate, _, run, _, folder = workspace
-    held = run.read_text()
-    one = f"agent:TEST-HELD:{run}"
-    code, error = run_main(evaluate, monkeypatch, capsys, "--partition", "held_out", "--run", one)
-    assert code == 1 and "requires --frozen-config" in error
+def held_arguments(folder, run, saved, frozen=FROZEN):
     config = folder / "frozen.json"
-    config.write_text(json.dumps({"model": "claude-opus-5-5", "effort": "medium", "max_lookups": 6}))
-    code, error = run_main(evaluate, monkeypatch, capsys, "--partition", "held_out", "--run", one, "--frozen-config", str(config))
-    assert code == 1 and "every held-out family" in error
-    assert held == run.read_text()
+    config.write_text(json.dumps(frozen))
+    return ["--partition", "held_out", "--frozen-config", str(config),
+            "--run", f"agent:TEST-HELD:{run}", "--run", f"agent:TEST-HELD-2:{run}",
+            "--retrieval", f"keyword_search:TEST-HELD:{saved}", "--retrieval", f"keyword_search:TEST-HELD-2:{saved}"]
 
 
-def test_reviewer_effort_counts_changes_and_time(tmp_path, entries):
+def test_held_out_gates_run_before_any_reference_is_read(workspace, monkeypatch, capsys):
+    evaluate, _, run, saved, folder = workspace
+    opened = []
+    monkeypatch.setattr(evaluate, "read_jsonl", lambda path: opened.append(path) or [])
+    code, error = run_main(evaluate, monkeypatch, capsys, "--partition", "held_out", "--run", f"agent:TEST-HELD:{run}")
+    assert code == 1 and "requires --frozen-config" in error
+    draft = held_arguments(folder, run, saved, {"status": "draft"})
+    code, error = run_main(evaluate, monkeypatch, capsys, *draft)
+    assert code == 1 and "not a frozen file" in error
+    monkeypatch.setattr(evaluate.freezing, "freeze_problems", lambda root, frozen: [])
+    complete = held_arguments(folder, run, saved)
+    # One system alone cannot pass: the frozen roster names two.
+    code, error = run_main(evaluate, monkeypatch, capsys, *complete[:8])
+    assert code == 1 and "names systems ['agent', 'keyword_search'], and runs were given for ['agent']" in error
+    # A missing family cannot pass.
+    code, error = run_main(evaluate, monkeypatch, capsys, *complete[:6], *complete[8:])
+    assert code == 1 and "agent needs exactly one run for every held-out family" in error
+    (folder / "benchmark/final-evaluation-record.json").write_text("{}")
+    code, error = run_main(evaluate, monkeypatch, capsys, *complete)
+    assert code == 1 and "already been run" in error
+    assert opened == []
+
+
+@pytest.mark.parametrize("change, message", [
+    ({"model": "claude-haiku-5-5"}, "model is 'claude-haiku-5-5', frozen is 'claude-opus-5-5'"),
+    ({"max_lookups": 12}, "max_lookups is 12, frozen is 6"),
+    ({"ocr": False}, "ocr is False, frozen is True"),
+    ({"code_commit": "fff999"}, "code other than the frozen commit"),
+    ({"uncommitted_changes": True}, "uncommitted code changes"),
+    ({"system": "llm_baseline"}, "the file was produced as 'llm_baseline'"),
+    (None, "records no settings"),
+])
+def test_run_settings_must_equal_the_frozen_configuration(workspace, monkeypatch, capsys, entries, change, message):
+    evaluate, _, run, saved, folder = workspace
+    monkeypatch.setattr(evaluate.freezing, "freeze_problems", lambda root, frozen: [])
+    settings = None if change is None else {**AGENT_SETTINGS, **change}
+    run.write_text("".join(json.dumps({**item, "run_settings": settings}) + "\n" for item in entries))
+    code, error = run_main(evaluate, monkeypatch, capsys, *held_arguments(folder, run, saved))
+    assert code == 1 and message in error and not (folder / "benchmark/final-evaluation-record.json").exists()
+
+
+def test_keyword_run_with_too_few_candidates_or_mixed_settings_is_refused(workspace, monkeypatch, capsys, entries):
+    evaluate, _, run, saved, folder = workspace
+    monkeypatch.setattr(evaluate.freezing, "freeze_problems", lambda root, frozen: [])
+    saved.write_text("".join(json.dumps({**item["retrieval"], "run_settings": {**KEYWORD_SETTINGS, "top_k": 5}}) + "\n" for item in entries))
+    code, error = run_main(evaluate, monkeypatch, capsys, *held_arguments(folder, run, saved))
+    assert code == 1 and "top_k is 5, frozen needs at least 10" in error
+    lines = [json.dumps({**item, "run_settings": {**AGENT_SETTINGS, "effort": effort}}) for item, effort in zip(entries, ("medium", "high", "medium"))]
+    run.write_text("\n".join(lines) + "\n")
+    code, error = run_main(evaluate, monkeypatch, capsys, *held_arguments(folder, run, saved))
+    assert code == 1 and "records carry different run settings" in error
+
+
+def test_complete_held_out_run_writes_a_record_and_cannot_repeat(workspace, monkeypatch, capsys):
+    evaluate, _, run, saved, folder = workspace
+    monkeypatch.setattr(evaluate.freezing, "freeze_problems", lambda root, frozen: [])
+    monkeypatch.setattr(evaluate.freezing, "git", lambda root, *arguments: "abc123")
+    arguments = held_arguments(folder, run, saved)
+    monkeypatch.setattr(sys, "argv", ["evaluate.py", *arguments])
+    evaluate.main()
+    report = capsys.readouterr().out
+    assert "held_out partition" in report and "- agent: code_commit abc123, effort medium, first_candidates 8" in report and "model claude-opus-5-5" in report
+    record = json.loads((folder / "benchmark/final-evaluation-record.json").read_text())
+    assert record["code_commit"] == "abc123"
+    assert record["systems"] == {"agent": ["TEST-HELD", "TEST-HELD-2"], "keyword_search": ["TEST-HELD", "TEST-HELD-2"]}
+    code, error = run_main(evaluate, monkeypatch, capsys, *arguments)
+    assert code == 1 and "already been run" in error
+
+
+def test_freeze_requires_a_clean_tree_then_detects_later_changes(tmp_path):
+    import subprocess
+    freezing = load("freeze_config")
+    git = lambda *arguments: subprocess.run(["git", "-C", str(tmp_path), "-c", "user.name=t", "-c", "user.email=t@example.com",
+                                             *arguments], check=True, capture_output=True)
+    (tmp_path / "benchmark").mkdir()
+    (tmp_path / "traceability").mkdir()
+    (tmp_path / "traceability/agent.py").write_text("LIMIT = 6\n")
+    (tmp_path / "benchmark/evaluation-config.draft.json").write_text(json.dumps(
+        {"status": "draft", "systems": {"agent": {"model": "claude-opus-5-5"}, "keyword_search": {"method": "BM25"}}}))
+    git("init", "-q")
+    with pytest.raises(ValueError, match="Commit or discard"):
+        freezing.freeze(tmp_path, "2026-12-01")
+    git("add", "-A"); git("commit", "-q", "-m", "code")
+    target = freezing.freeze(tmp_path, "2026-12-01")
+    frozen = json.loads(target.read_text())
+    assert frozen["status"] == "frozen" and frozen["model_identifiers"] == {"agent": "claude-opus-5-5"}
+    git("add", "-A"); git("commit", "-q", "-m", "freeze")
+    assert freezing.freeze_problems(tmp_path, frozen) == ["Tag the commit that holds the frozen configuration before the held-out run"]
+    git("tag", "evaluation-freeze-2026-12-01")
+    assert freezing.freeze_problems(tmp_path, frozen) == []
+    (tmp_path / "traceability/agent.py").write_text("LIMIT = 9\n")
+    assert "There are uncommitted changes to frozen files" in freezing.freeze_problems(tmp_path, frozen)
+    git("commit", "-q", "-am", "tuned after the freeze"); git("tag", "later")
+    assert freezing.freeze_problems(tmp_path, frozen) == ["Code, schema, conventions, or manifest changed since the freeze"]
+    assert freezing.freeze_problems(tmp_path, {"status": "draft"}) == ["The configuration is not a frozen file written by benchmark/freeze_config.py"]
+
+
+def test_budget_estimates_high_and_stops_at_the_cap():
+    from traceability.budget import Budget
+    budget = Budget("claude-opus-5-5", max_usd=0.05)
+    budget.add({"input_tokens": 1000, "output_tokens": 500, "cache_read_input_tokens": 10000,
+                "cache_creation_input_tokens": 2000, "server_tool_use": None})
+    assert budget.spent == pytest.approx((1000 * 4 + 2000 * 8 + 10000 * 0.2 + 500 * 20) / 1e6)
+    assert not budget.exhausted()
+    budget.add({"input_tokens": 5000, "output_tokens": 0})
+    assert budget.exhausted() and budget.report() == {"estimated_usd": 0.052, "max_usd": 0.05}
+    with pytest.raises(ValueError, match="No price is recorded"):
+        Budget("some-other-model", max_usd=1)
+    assert Budget("some-other-model").report() == {"estimated_usd": None, "max_usd": None}
+
+
+def test_reviewer_effort_counts_changes_and_minutes_by_condition(tmp_path, entries):
     effort = load("reviewer_effort")
     store = ReviewStore(tmp_path / "reviews.jsonl", entries)
-    first, second = entries[0]["mapping"]["mapping_id"], entries[1]["mapping"]["mapping_id"]
-    store.save(first, "reject", elapsed_seconds=10)
-    store.save(first, "accept", elapsed_seconds=5)
-    store.save(second, "correct", {"status": "supported", "rationale": "Definition applies.",
-                                   "evidence": [{"passage_id": "TEST-SAP-v1:p4:1", "quote": "received at least one dose"}]},
-               elapsed_seconds=40)
+    first, second, third = (entry["mapping"]["mapping_id"] for entry in entries)
+    own = {"status": "supported", "rationale": "Definition applies.",
+           "evidence": [{"passage_id": "TEST-SAP-v1:p4:1", "quote": "received at least one dose"}]}
+    store.save(first, "reject", elapsed_seconds=60, reviewer="R1", condition="with_proposals")
+    store.save(first, "accept", elapsed_seconds=30, reviewer="R1", condition="with_proposals")
+    store.save(second, "correct", own, elapsed_seconds=120, reviewer="R1", condition="with_proposals")
+    store.save(third, "correct", {"status": "not_found_in_supplied_sap", "rationale": "Searched for em dash rules."},
+               elapsed_seconds=240, reviewer="R1", condition="without_proposals")
     summary = effort.effort(entries, ReviewStore(tmp_path / "reviews.jsonl", entries))
-    assert summary["decisions"] == {"accept": 1, "correct": 1, "reject": 0, "pending": 1}
+    assert summary["reviewers"] == ["R1"] and summary["decisions"] == {"accept": 1, "correct": 2, "reject": 0, "pending": 0}
     assert summary["decisions_revised"] == 1
-    assert summary["corrections"] == {"status_changed": 1, "links_added": 1, "links_removed": 0, "rationale_changed": 1}
-    assert (summary["components_timed"], summary["total_seconds"], summary["median_seconds_per_component"]) == (2, 55.0, 27.5)
+    assert summary["corrections_to_proposals"] == {"corrections": 1, "status_changed": 1, "links_added": 1,
+                                                   "links_removed": 0, "rationale_changed": 1}
+    assert summary["by_condition"]["with_proposals"]["median_minutes_per_component"] == 1.75
+    assert summary["by_condition"]["without_proposals"] == {
+        "components_timed": 1, "total_minutes": 4.0, "median_minutes_per_component": 4.0,
+        "mean_minutes_per_component": 4.0, "decisions": {"correct": 1}}
+
+
+def test_crossover_plan_swaps_halves_and_balances_shell_types(entries):
+    plan_module = load("crossover_plan")
+    from conftest import entry
+    run = [entry(f"c{number}", "table_row", f"Row {number}") for number in range(12)]
+    for number, item in enumerate(run):
+        shell = ("TABLE", "FIGURE", "LISTING")[number % 3]
+        item["component"]["shell_id"] = shell
+    types = {"TABLE": "table", "FIGURE": "figure", "LISTING": "listing"}
+    plan = plan_module.build_plan(run, types, ["R1", "R2"], 6, seed=3)
+    first, second = plan["assignments"]["R1"], plan["assignments"]["R2"]
+    assert plan["shell_types"] == {"figure": 2, "listing": 2, "table": 2} and len(first) == 6
+    assert set(first) == set(second) == set(plan["order"]["R1"]) == set(plan["order"]["R2"])
+    assert all(first[component] != second[component] for component in first)
+    assert sorted(first.values()).count("with_proposals") == 3
+    assert plan == plan_module.build_plan(run, types, ["R1", "R2"], 6, seed=3)
+    with pytest.raises(ValueError, match="exactly two different reviewers"):
+        plan_module.build_plan(run, types, ["R1", "R1"], 6, seed=3)
+    with pytest.raises(ValueError, match="only 12 components"):
+        plan_module.build_plan(run, types, ["R1", "R2"], 20, seed=3)
+
+
+def test_adjudication_is_blind_merges_systems_and_needs_reasons(entries, tmp_path):
+    adjudication = load("adjudication")
+    from conftest import METHOD, cited
+    spare = cited(METHOD, "analyzed with an ANCOVA model")
+    spare["page"] = 9
+    entries[1]["mapping"]["assessment"] = {"status": "supported", "rationale": "x", "convention_ids": [],
+                                           "open_questions": [], "evidence": [spare]}
+    run = tmp_path / "run.jsonl"
+    run.write_text("".join(json.dumps(item) + "\n" for item in entries))
+    items, key = adjudication.unmatched_items([("agent", "TEST", run), ("llm_baseline", "TEST", run)], lambda family: references())
+    assert len(items) == 1 and "system" not in items[0] and "mapping_id" not in items[0]
+    assert sorted(owner["system"] for owner in key[items[0]["item_id"]]) == ["agent", "llm_baseline"]
+    assert items[0]["proposed_quote"] == "analyzed with an ANCOVA model" and "received at least one dose" in items[0]["reference_quotes"]
+    row = dict(items[0])
+    assert adjudication.apply([row], key)["agent"] == {"unmatched_links": 1, "ruled_equivalent": 0, "ruled_unsupported": 0, "undecided": 1}
+    row.update(decision="unsupported")
+    with pytest.raises(ValueError, match="needs a reason"):
+        adjudication.apply([row], key)
+    row.update(decision="unsure", reason="Method sentence, but the label is a population.", adjudicator="Reviewer A")
+    assert adjudication.apply([row], key)["agent"]["undecided"] == 1
+    row.update(second_decision="unsupported", second_reason="Does not define or apply the population.", second_adjudicator="Reviewer A")
+    with pytest.raises(ValueError, match="different person"):
+        adjudication.apply([row], key)
+    row.update(second_adjudicator="Reviewer B")
+    assert adjudication.apply([row], key) == {
+        "agent": {"unmatched_links": 1, "ruled_equivalent": 0, "ruled_unsupported": 1, "undecided": 0},
+        "llm_baseline": {"unmatched_links": 1, "ruled_equivalent": 0, "ruled_unsupported": 1, "undecided": 0}}
 
 
 def test_coverage_report_reads_development_only():

@@ -10,11 +10,16 @@ overall and by shell type, with per-family rows.
       --run llm-baseline:NCT03469934:runs/baseline-NCT03469934.jsonl \
       --out-json runs/evaluation.json --out-md runs/evaluation.md
 
-The held-out partition is for the final evaluation only. It requires --frozen-config, a file that
-records the settings fixed after development, and a run for every held-out family from each system.
+The held-out partition is for the final evaluation only, run once by one person. It requires a
+frozen configuration written by benchmark/freeze_config.py, no change to code since the freeze, a tag
+on the current commit, and a run for every held-out family from each system. It then writes
+benchmark/final-evaluation-record.json and refuses to run again while that record exists. Runs must
+cover exactly the systems the frozen configuration names, and each run file's recorded settings
+(model, effort, limits, retrieval, OCR, code commit) must equal the frozen ones.
 """
 
 import argparse
+import datetime
 import hashlib
 import importlib.util
 import json
@@ -36,6 +41,8 @@ def load(name):
 
 
 mappings, retrieval = load("score_development_mappings"), load("score_development_retrieval")
+freezing = load("freeze_config")
+RECORD = "benchmark/final-evaluation-record.json"
 
 
 def citation_counts(entries):
@@ -52,6 +59,66 @@ def citation_counts(entries):
             counts["citations"] += 1
             counts["verified_citations"] += link["quote"] in texts.get(link["passage_id"], "")
     return counts
+
+
+def recorded_settings(records, path):
+    """The settings a run file recorded. Every record in a file must carry the same ones."""
+    found = {json.dumps(record.get("run_settings"), sort_keys=True) for record in records}
+    if len(found) != 1:
+        raise ValueError(f"{path}: records carry different run settings")
+    return json.loads(found.pop())
+
+
+def served_models(records):
+    return sorted({model for record in records for part in ("agent", "baseline")
+                   for model in record.get(part, {}).get("served_models", [])})
+
+
+def setting_mismatches(system, settings, frozen):
+    """Ways one run's recorded settings differ from the frozen configuration."""
+    if settings is None:
+        return ["the run file records no settings"]
+    expected = frozen["systems"][system]
+    found = []
+    if settings.get("system") != system:
+        found.append(f"the file was produced as {settings.get('system')!r}")
+    for key, value in expected.items():
+        if key == "command":
+            continue
+        if key == "top_k":
+            if not isinstance(settings.get("top_k"), int) or settings["top_k"] < max(value):
+                found.append(f"top_k is {settings.get('top_k')}, frozen needs at least {max(value)}")
+        elif settings.get(key) != value:
+            found.append(f"{key} is {settings.get(key)!r}, frozen is {value!r}")
+    ocr = frozen["sap_text"]["ocr_for_pages_without_text"]
+    if settings.get("ocr") != ocr:
+        found.append(f"ocr is {settings.get('ocr')!r}, frozen is {ocr!r}")
+    if settings.get("code_commit") != frozen["code_commit"]:
+        found.append("the run was produced by code other than the frozen commit")
+    if settings.get("uncommitted_changes") is not False:
+        found.append("the run was produced with uncommitted code changes")
+    return found
+
+
+def held_out_problems(frozen, runs, retrievals, held):
+    """Everything wrong with a held-out submission, found without opening any reference file."""
+    problems = []
+    given = {}
+    for system, family_id, path in runs:
+        given.setdefault(system, []).append((family_id, recorded_settings(load_run(path), path)))
+    for system, family_id, path in retrievals:
+        records = list(retrieval.read_records(path).values())
+        given.setdefault(system, []).append((family_id, recorded_settings(records, path)))
+    roster = sorted(frozen["systems"])
+    if sorted(given) != roster:
+        problems.append(f"the frozen configuration names systems {roster}, and runs were given for {sorted(given)}")
+    for system, files in sorted(given.items()):
+        if sorted(family for family, _ in files) != held:
+            problems.append(f"{system} needs exactly one run for every held-out family")
+        if system in frozen["systems"]:
+            for family_id, settings in files:
+                problems += [f"{system} on {family_id}: {issue}" for issue in setting_mismatches(system, settings, frozen)]
+    return problems
 
 
 def parse_triples(values, label):
@@ -76,9 +143,11 @@ def evaluate(manifest, partition, runs, retrievals):
             references[family_id] = {record["component_id"]: record for record in read_jsonl(path)}
         return references[family_id]
 
-    results = {"partition": partition, "systems": {}, "retrieval": {}}
+    results = {"partition": partition, "systems": {}, "retrieval": {}, "run_settings": {}}
     for system, family_id, path in runs:
         entries = load_run(path)
+        results["run_settings"].setdefault(system, {})[family_id] = {
+            "settings": recorded_settings(entries, path), "served_models": served_models(entries)}
         shell_types = {shell["document_id"]: shell["type"] for shell in families.get(family_id, {}).get("shells", [])}
         groups = mappings.score(entries, reference(family_id), shell_types)
         record = results["systems"].setdefault(system, {"families": {}, "pooled": {}, "citations": Counter()})
@@ -96,6 +165,8 @@ def evaluate(manifest, partition, runs, retrievals):
             "rate": round(counts["verified_citations"] / counts["citations"], 3) if counts["citations"] else None}
     for system, family_id, path in retrievals:
         saved = retrieval.read_records(path)
+        results["run_settings"].setdefault(system, {})[family_id] = {
+            "settings": recorded_settings(list(saved.values()), path), "served_models": []}
         record = results["retrieval"].setdefault(system, {"families": {}, "pooled": {}})
         for top_k in (1, 5, 10):
             row = retrieval.coverage(reference(family_id), saved, top_k)
@@ -152,6 +223,20 @@ def markdown(results, frozen=None):
             confusion = record["pooled"]["all"]["status_confusion_reference_to_proposed"]
             lines.append(f"- {system}: " + ", ".join(f"{pair} {count}" for pair, count in confusion.items()))
         lines.append("")
+    lines += ["## Run settings", ""]
+    for system, families in results["run_settings"].items():
+        distinct = {json.dumps(record["settings"], sort_keys=True) for record in families.values()}
+        for text in sorted(distinct):
+            settings = json.loads(text)
+            if settings is None:
+                lines.append(f"- {system}: no settings were recorded with the run.")
+            else:
+                lines.append(f"- {system}: " + ", ".join(f"{key} {value}" for key, value in settings.items() if key != "system"))
+        requested = {(record["settings"] or {}).get("model") for record in families.values()}
+        other = sorted({model for record in families.values() for model in record["served_models"]} - requested)
+        if other:
+            lines.append(f"- {system}: some calls were served by {', '.join(other)}, not the requested model.")
+    lines.append("")
     for system, families in results["families_scored"].items():
         missing = sorted(set(results["partition_families"]) - set(families))
         if missing:
@@ -178,14 +263,25 @@ def main():
         frozen = None
         if args.frozen_config:
             frozen = {"path": str(args.frozen_config), "sha256": hashlib.sha256(args.frozen_config.read_bytes()).hexdigest()}
-        results = evaluate(manifest, args.partition, runs, retrievals)
         if args.partition == "held_out":
+            # Every gate is checked before any held-out reference is opened.
             if frozen is None:
                 raise ValueError("The held-out evaluation requires --frozen-config")
-            incomplete = {system: families for system, families in results["families_scored"].items()
-                          if families != results["partition_families"]}
-            if incomplete:
-                raise ValueError(f"Every system needs a run for every held-out family: {sorted(incomplete)}")
+            if (ROOT / RECORD).exists():
+                raise ValueError(f"The held-out evaluation has already been run. See {RECORD}")
+            problems = freezing.freeze_problems(ROOT, json.loads(args.frozen_config.read_text(encoding="utf-8")))
+            if problems:
+                raise ValueError("The held-out evaluation cannot run: " + "; ".join(problems))
+            held = sorted(family["family_id"] for family in manifest["families"] if family["partition"] == "held_out")
+            problems = held_out_problems(json.loads(args.frozen_config.read_text(encoding="utf-8")), runs, retrievals, held)
+            if problems:
+                raise ValueError("The held-out evaluation cannot run:\n- " + "\n- ".join(problems))
+        results = evaluate(manifest, args.partition, runs, retrievals)
+        if args.partition == "held_out":
+            (ROOT / RECORD).write_text(json.dumps({
+                "ran_at": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds"),
+                "frozen_config": frozen, "code_commit": freezing.git(ROOT, "rev-parse", "HEAD"),
+                "systems": results["families_scored"]}, indent=1) + "\n", encoding="utf-8")
         results["frozen_config"] = frozen
         report = markdown(results, frozen)
         for path, text in ((args.out_json, json.dumps(results, indent=1) + "\n"), (args.out_md, report)):

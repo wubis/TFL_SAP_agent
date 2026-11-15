@@ -90,21 +90,56 @@ def test_correction_can_cite_a_passage_found_by_search(tmp_path, entries):
     assert store.save(mapping_id(entries, 1), "correct", selection)["corrected_assessment"]["evidence"][0]["page"] == 20
 
 
-def test_matrix_has_one_row_per_quotation_with_its_own_location(tmp_path, entries):
+def test_matrix_has_one_row_per_standing_quotation_with_its_own_location(tmp_path, entries):
     store = ReviewStore(tmp_path / "reviews.jsonl", entries)
     store.save(mapping_id(entries, 0), "accept")
     store.save(mapping_id(entries, 2), "reject", note="not a reporting specification")
     rows = list(csv.DictReader(io.StringIO(matrix_csv(entries, store.current))))
     assert [row["component_id"].split(":")[1] for row in rows] == ["ls-mean", "ls-mean", "population", "dash-note"]
-    assert [(row["evidence_section"], row["evidence_page"]) for row in rows[:2]] == [
+    assert [(row["final_evidence_section"], row["final_evidence_page"]) for row in rows[:2]] == [
         ("4.1 Analysis populations", "4"), ("7.2 Primary endpoint analysis", "9")]
-    assert METHOD[3].endswith(rows[1]["evidence_quote"])
+    assert METHOD[3].endswith(rows[1]["final_evidence_quote"])
     assert [(row["review_action"], row["final_status"]) for row in rows[1:]] == [
         ("accept", "supported"), ("pending", ""), ("reject", "")]
     assert rows[3]["reviewer_note"] == "not a reporting specification"
     exported = json.loads(matrix_json(entries, store.current))
     assert [item["assessment_after_review"] is not None for item in exported] == [True, False, False]
     assert OTHER_VISIT[3] not in matrix_csv(entries, store.current)
+
+
+def test_rejected_and_pending_proposals_never_appear_as_final_evidence(tmp_path, entries):
+    store = ReviewStore(tmp_path / "reviews.jsonl", entries)
+    store.save(mapping_id(entries, 0), "reject")
+    rows = list(csv.DictReader(io.StringIO(matrix_csv(entries, store.current))))
+    rejected = [row for row in rows if row["component_id"].endswith("ls-mean")]
+    assert len(rejected) == 1
+    assert all(value == "" for name, value in rejected[0].items() if name.startswith("final_"))
+    assert rejected[0]["proposed_status"] == "supported"
+    assert "p4 [4.1 Analysis populations]" in rejected[0]["proposed_evidence"] and "p9 [" in rejected[0]["proposed_evidence"]
+    pending = next(row for row in rows if row["component_id"].endswith("population"))
+    assert pending["final_rationale"] == "" and pending["proposed_rationale"].startswith("Contextual evidence")
+    exported = json.loads(matrix_json(entries, store.current))[0]
+    assert exported["assessment_after_review"] is None and exported["evidence_origin"] is None
+    assert exported["proposal"]["assessment"]["status"] == "supported"
+
+
+def test_reviewer_found_passage_is_saved_and_reloaded_for_audit(tmp_path, entries):
+    path = tmp_path / "reviews.jsonl"
+    store = ReviewStore(path, entries)
+    extra = passage(("TEST-SAP-v1:p20:1", 20, "9.1 Display", "Tables present two treatment columns."))
+    unused = passage(("TEST-SAP-v1:p21:1", 21, "9.2 Display", "Listings are sorted by participant."))
+    store.add_passages([extra, unused])
+    store.save(mapping_id(entries, 1), "correct", {"status": "supported", "rationale": "x",
+                                                   "evidence": [{"passage_id": extra["passage_id"], "quote": "two treatment columns"}]})
+    saved = [json.loads(line) for line in store.passages_path.read_text().splitlines()]
+    assert [(item["sap_id"], item["sap_version"], item["passage"]["passage_id"]) for item in saved] == [
+        ("TEST-SAP-v1", "1", extra["passage_id"])]
+    reopened = ReviewStore(path, entries)
+    assert reopened.extra_passages == {extra["passage_id"]: extra}
+    assert reopened.source_passages(entries[1])[-1] == extra and len(reopened.source_passages(entries[0])) == 3
+    store.passages_path.write_text(json.dumps({"sap_id": "TEST-SAP-v1", "sap_version": "2", "passage": extra}) + "\n")
+    with pytest.raises(ValueError, match="different SAP version"):
+        ReviewStore(path, entries)
 
 
 def test_timing_events_go_to_a_sidecar(tmp_path, entries):

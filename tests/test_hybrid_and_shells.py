@@ -58,6 +58,17 @@ def test_embedder_returning_too_few_vectors_is_refused():
         HybridIndex(passages(), lambda texts: [[1.0]])
 
 
+def test_mismatched_embedding_dimensions_are_refused():
+    ragged = lambda texts: [[1.0, 0.0]] + [[1.0, 0.0, 0.0] for _ in texts[1:]]
+    with pytest.raises(ValueError, match="different or zero length"):
+        HybridIndex(passages(), ragged)
+    calls = []
+    shrinking = lambda texts: calls.append(1) or [[1.0, 0.0, 0.0][:3 if len(calls) == 1 else 2] for _ in texts]
+    index = HybridIndex(passages(), shrinking)
+    with pytest.raises(ValueError, match="query vector has 2 dimensions and the passages have 3"):
+        index.search(entry("ls-mean", "table_row", "Change from baseline, LS mean (SE)")["component"], 2)
+
+
 def test_stacked_header_separates_group_leaf_and_single_columns():
     lines = ["                      Result at Week 12        Difference (95% CI)   P-value",
              "                  Treatment A   Treatment B     for A versus",

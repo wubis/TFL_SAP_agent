@@ -57,6 +57,9 @@
   .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 8px 0; }
   .error { color: var(--review); min-height: 1.2em; }
   .muted { color: var(--muted); }
+  img.shell { max-width: 100%; border: 1px solid var(--line); border-radius: 4px; background: #fff; }
+  details summary { cursor: pointer; color: var(--muted); margin: 6px 0; }
+  kbd { border: 1px solid var(--line); border-radius: 3px; padding: 0 4px; font-size: 11px; }
   #correction { display: none; }
   #correction.open { display: block; }
   ul.plain { margin: 4px 0; padding-left: 18px; }
@@ -66,13 +69,17 @@
 <header>
   <h1>TFL to SAP reviewer</h1>
   <label>Shell <select id="shell"></select></label>
+  <label>Status <select id="filter-status"><option value="">all</option></select></label>
+  <label>Decision <select id="filter-action"><option value="">all</option></select></label>
   <span id="summary" class="muted"></span>
+  <span id="reviewer" class="muted"></span>
   <span class="spacer"></span>
   <a class="button" href="/export.csv">Export matrix (CSV)</a>
   <a class="button" href="/export.json">Export matrix (JSON)</a>
 </header>
 <main>
-  <section id="list-pane"><h2>Components</h2><ul class="components" id="components"></ul></section>
+  <section id="list-pane"><h2>Components</h2><ul class="components" id="components"></ul>
+    <p class="muted"><kbd>j</kbd> <kbd>k</kbd> next and previous · <kbd>a</kbd> accept · <kbd>c</kbd> correct · <kbd>x</kbd> reject</p></section>
   <section id="detail-pane"><p class="muted">Select a component.</p></section>
   <section id="source-pane"></section>
 </main>
@@ -114,6 +121,23 @@ function renderSummary() {
   document.getElementById("summary").textContent =
     `${s.accept} accepted, ${s.correct} corrected, ${s.reject} rejected, ${s.pending} pending`;
 }
+function renderFilters() {
+  const status = document.getElementById("filter-status"), action = document.getElementById("filter-action");
+  for (const value of STATUSES) status.append(el("option", {value}, STATUS_TEXT[value]));
+  for (const value of ["pending", "accept", "correct", "reject"]) action.append(el("option", {value}, value));
+  status.onchange = action.onchange = () => renderList();
+  document.getElementById("reviewer").textContent = state.reviewer ? `Reviewer: ${state.reviewer}` : "";
+}
+function blind(entry) { return entry.condition === "without_proposals"; }
+function visibleIndexes() {
+  const shellId = document.getElementById("shell").value;
+  const status = document.getElementById("filter-status").value, action = document.getElementById("filter-action").value;
+  return state.entries.map((entry, index) => index).filter(index => {
+    const entry = state.entries[index];
+    return entry.component.shell_id === shellId && (!status || (!blind(entry) || entry.review) && inEffect(entry).status === status)
+      && (!action || actionOf(entry) === action);
+  });
+}
 function renderShells() {
   const select = document.getElementById("shell");
   select.replaceChildren();
@@ -124,28 +148,29 @@ function renderShells() {
   select.onchange = () => { selected = null; renderList(); renderDetail(); };
 }
 function renderList() {
-  const shellId = document.getElementById("shell").value;
   const list = document.getElementById("components");
   list.replaceChildren();
-  state.entries.forEach((entry, index) => {
-    if (entry.component.shell_id !== shellId) return;
+  for (const index of visibleIndexes()) {
+    const entry = state.entries[index];
+    const hidden = blind(entry) && !entry.review;
     const item = el("li", {class: index === selected ? "selected" : "", onclick: () => select(index)},
       el("div", {class: "kind"}, entry.component.kind.replaceAll("_", " "), " · ", entry.component.locator),
       el("div", {}, entry.component.label),
-      el("div", {}, chip(inEffect(entry).status), chip(actionOf(entry))));
+      el("div", {}, hidden ? chip("pending", "no proposal shown") : chip(inEffect(entry).status), chip(actionOf(entry))));
     list.append(item);
-  });
+  }
 }
 function select(index) {
   selected = index; draft = null; searchResults = []; lastQuery = ""; opened = performance.now();
   noteText = (state.entries[index].review && state.entries[index].review.note) || "";
   api("/api/open", {mapping_id: state.entries[index].mapping.mapping_id}).catch(() => {});
+  if (blind(state.entries[index]) && !state.entries[index].review) startDraft(state.entries[index]);
   renderList(); renderDetail();
 }
 
 function passageLookup(entry) {
   const map = new Map();
-  for (const passage of [...entry.retrieval.candidates, ...searchResults]) map.set(passage.passage_id, passage);
+  for (const passage of [...entry.retrieval.candidates, ...(entry.reviewer_passages || []), ...searchResults]) map.set(passage.passage_id, passage);
   return map;
 }
 function highlighted(text, quotes) {
@@ -185,6 +210,10 @@ function passageCard(entry, passage, rank, quotes) {
 
 function startDraft(entry) {
   if (draft) return;
+  if (blind(entry) && !entry.review) {
+    draft = {status: "supported", rationale: "", open_questions: "", convention_ids: [], evidence: []};
+    return;
+  }
   const base = inEffect(entry);
   draft = {status: base.status, rationale: base.rationale, open_questions: base.open_questions.join("\n"),
            convention_ids: [...base.convention_ids],
@@ -204,6 +233,11 @@ async function save(action) {
   try {
     const result = await api("/api/review", body);
     entry.review = result.review; state.summary = result.summary; draft = null;
+    const cited = new Set(action === "correct" ? result.review.corrected_assessment.evidence.map(item => item.passage_id) : []);
+    const known = new Set(entry.retrieval.candidates.map(passage => passage.passage_id));
+    entry.reviewer_passages = [...(entry.reviewer_passages || []), ...searchResults]
+      .filter((passage, at, all) => cited.has(passage.passage_id) && !known.has(passage.passage_id)
+        && all.findIndex(other => other.passage_id === passage.passage_id) === at);
     renderSummary(); renderList(); renderDetail();
   } catch (error) { setError(error.message); }
 }
@@ -230,12 +264,27 @@ function renderDetail() {
       })
     : [el("p", {class: "muted"}, "No SAP passage is linked.")];
 
-  const proposalBlock = [
+  const lookups = (entry.agent && entry.agent.lookups) || [];
+  const traceBlock = lookups.length ? [el("details", {}, el("summary", {}, `Searches the agent ran (${lookups.length})`),
+    el("ul", {class: "plain"}, lookups.map(item => el("li", {},
+      `${item.tool.replaceAll("_", " ")}: ${Object.values(item.input).join(" ")} (${item.returned.length} passages)`))))] : [];
+  const flagged = ((entry.baseline && entry.baseline.citations) || []).filter(check => check.outcome !== "verified");
+  const flagBlock = flagged.length ? [el("p", {class: "error"},
+    `${flagged.length} quotation(s) in this proposal were not found on the cited page.`)] : [];
+  const shell = state.shells[component.shell_id] || {};
+  const imageBlock = shell.has_image ? [el("details", {}, el("summary", {}, "Shell page"),
+    el("img", {class: "shell", loading: "lazy", alt: "The shell page this component comes from",
+               src: "/shell.png?shell_id=" + encodeURIComponent(component.shell_id)}))] : [];
+  const proposalBlock = blind(entry) ? [
+    el("h2", {}, "No proposal shown"),
+    el("p", {}, "Trace this component yourself. Search the SAP on the right, cite the exact words, and save your assessment."),
+  ] : [
     el("h2", {}, entry.review && entry.review.action === "correct" ? "Agent proposal (kept for comparison)" : "Agent proposal"),
     el("div", {}, chip(proposal.status)),
     el("p", {}, proposal.rationale),
     proposal.open_questions.length ? el("ul", {class: "plain"}, proposal.open_questions.map(q => el("li", {}, q))) : null,
     proposal.convention_ids.length ? el("p", {}, "Display convention, kept apart from SAP evidence: ", proposal.convention_ids.join(", ")) : null,
+    ...flagBlock, ...traceBlock,
   ];
   const correctedBlock = entry.review && entry.review.action === "correct" && !draft ? [
     el("h2", {}, "Reviewer correction"), el("div", {}, chip(assessment.status)), el("p", {}, assessment.rationale),
@@ -255,12 +304,13 @@ function renderDetail() {
         onchange: event => { draft.convention_ids = event.target.checked
           ? [...draft.convention_ids, rule.convention_id] : draft.convention_ids.filter(id => id !== rule.convention_id); }}),
         " ", rule.convention_id)) : [];
-    form.append(el("h2", {}, "Correction"), el("label", {}, "Status ", status), el("div", {class: "row"}),
+    form.append(...[el("h2", {}, blind(entry) ? "Your assessment" : "Correction"), el("label", {}, "Status ", status), el("div", {class: "row"}),
       el("label", {}, "Rationale", rationale), el("label", {}, "Open questions", questions),
       conventions.length ? el("div", {class: "row"}, "Display conventions: ", conventions) : null,
       el("p", {class: "muted"}, "To add evidence, select the exact words in a passage on the right and press Cite selected text."),
-      el("div", {class: "row"}, el("button", {class: "primary", onclick: () => save("correct")}, "Save correction"),
-        el("button", {onclick: () => { draft = null; renderDetail(); }}, "Cancel")));
+      el("div", {class: "row"}, el("button", {class: "primary", onclick: () => save("correct")},
+          blind(entry) ? "Save my assessment" : "Save correction"),
+        blind(entry) ? null : el("button", {onclick: () => { draft = null; renderDetail(); }}, "Cancel"))].filter(Boolean));
   }
 
   const note = el("textarea", {id: "note", rows: 2, placeholder: "Optional reviewer note",
@@ -270,10 +320,13 @@ function renderDetail() {
     el("div", {}, "Review: ", chip(actionOf(entry))),
     el("h2", {}, "Component in context"),
     el("table", {class: "context"}, contextRows.map(([name, value]) => el("tr", {}, el("th", {}, name), el("td", {}, value || "not stated")))),
+    ...imageBlock,
     ...proposalBlock, ...correctedBlock,
-    el("h2", {}, draft ? "Evidence in the correction" : "Linked SAP evidence"), ...evidenceList,
+    el("h2", {}, draft ? (blind(entry) ? "Evidence you have cited" : "Evidence in the correction") : "Linked SAP evidence"), ...evidenceList,
     form,
     el("h2", {}, "Decision"), note,
+    blind(entry) ? el("div", {class: "row"},
+      el("button", {disabled: draft ? "" : null, onclick: () => { startDraft(entry); renderDetail(); }}, "Edit my assessment")) :
     el("div", {class: "row"},
       el("button", {class: "primary", disabled: draft ? "" : null, onclick: () => save("accept")}, "Accept"),
       el("button", {disabled: draft ? "" : null, onclick: () => { startDraft(entry); renderDetail(); }}, "Correct"),
@@ -282,8 +335,13 @@ function renderDetail() {
     el("div", {class: "error", id: "error"})].filter(Boolean));
 
   const quotesFor = passage => shown.evidence.filter(item => item.passage_id === passage.passage_id).map(item => item.quote);
-  const children = [el("h2", {}, "Candidate SAP passages")];
-  if (!entry.retrieval.candidates.length) children.push(el("p", {class: "muted"}, "Retrieval returned no passage."));
+  const children = [el("h2", {}, blind(entry) ? "SAP passages" : "Candidate SAP passages")];
+  if (!entry.retrieval.candidates.length) children.push(el("p", {class: "muted"},
+    blind(entry) ? "Use the search below to find passages." : "Retrieval returned no passage."));
+  const added = (entry.reviewer_passages || []).filter(passage => !searchResults.some(other => other.passage_id === passage.passage_id));
+  if (added.length) children.push(el("h2", {}, "Passages added by the reviewer"));
+  added.forEach((passage, index) => children.push(passageCard(entry, passage, `Added ${index + 1}`, quotesFor(passage))));
+  if (added.length && entry.retrieval.candidates.length) children.push(el("h2", {}, "Retrieved candidates"));
   entry.retrieval.candidates.forEach((passage, index) =>
     children.push(passageCard(entry, passage, `Rank ${index + 1}`, quotesFor(passage))));
   if (state.search_enabled) {
@@ -300,7 +358,19 @@ function renderDetail() {
   source.replaceChildren(...children);
 }
 
-api("/api/state").then(payload => { state = payload; renderSummary(); renderShells(); renderList(); renderDetail(); })
+document.addEventListener("keydown", event => {
+  if (!state || event.ctrlKey || event.metaKey || event.altKey || /^(INPUT|TEXTAREA|SELECT)$/.test(event.target.tagName)) return;
+  const shown = visibleIndexes(), at = shown.indexOf(selected);
+  if (event.key === "j" && shown.length) select(shown[Math.min(at + 1, shown.length - 1)]);
+  else if (event.key === "k" && shown.length) select(shown[Math.max(at - 1, 0)]);
+  else if (selected === null || draft || blind(state.entries[selected])) return;
+  else if (event.key === "a") save("accept");
+  else if (event.key === "x") save("reject");
+  else if (event.key === "c") { startDraft(state.entries[selected]); renderDetail(); }
+  else return;
+  event.preventDefault();
+});
+api("/api/state").then(payload => { state = payload; renderSummary(); renderFilters(); renderShells(); renderList(); renderDetail(); })
   .catch(error => { document.getElementById("detail-pane").textContent = error.message; });
 </script>
 </body>

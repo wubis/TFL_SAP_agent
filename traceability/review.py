@@ -17,10 +17,13 @@ ACTIONS = ("pending", "accept", "correct", "reject")
 MATRIX_COLUMNS = (
     "component_id", "shell_id", "shell_version", "kind", "label", "locator",
     "population", "endpoint", "visit", "treatment_groups", "surrounding_labels",
-    "sap_id", "sap_version", "mapping_id", "proposed_status", "review_action", "final_status",
-    "evidence_origin", "evidence_number", "evidence_passage_id", "evidence_section", "evidence_page",
-    "evidence_quote", "evidence_extraction", "rationale", "convention_ids", "open_questions", "reviewer_note",
+    "sap_id", "sap_version", "mapping_id", "review_action",
+    "final_status", "final_evidence_origin", "final_evidence_number", "final_evidence_passage_id",
+    "final_evidence_section", "final_evidence_page", "final_evidence_quote", "final_evidence_extraction",
+    "final_rationale", "final_convention_ids", "final_open_questions", "reviewer_note",
+    "proposed_status", "proposed_rationale", "proposed_evidence", "proposed_convention_ids", "proposed_open_questions",
 )
+FINAL_EVIDENCE = ("number", "passage_id", "section", "page", "quote", "extraction")
 
 
 def load_schema():
@@ -101,7 +104,16 @@ class ReviewStore:
         self.validator = Draft202012Validator({"$ref": "#/$defs/review", "$defs": schema["$defs"]})
         rules = load_conventions() if conventions is None else conventions
         self.convention_ids = {rule["convention_id"] for rule in rules}
+        self.passages_path = self.path.with_name(self.path.name + ".passages.jsonl")
+        self.saps = {(entry["mapping"]["sap_id"], entry["mapping"]["sap_version"]) for entry in entries}
         self.extra_passages = {}
+        if self.passages_path.exists():
+            # Passages a reviewer found by search and cited. They are reloaded so the citation can be audited later.
+            for number, record in enumerate(read_jsonl(self.passages_path), 1):
+                if (record.get("sap_id"), record.get("sap_version")) not in self.saps:
+                    raise ValueError(f"{self.passages_path.name} line {number}: passage is from a different SAP version")
+                self.extra_passages[record["passage"]["passage_id"]] = record["passage"]
+        self.saved_passages = set(self.extra_passages)
         self.current = {}
         if self.path.exists():
             for number, record in enumerate(read_jsonl(self.path), 1):
@@ -149,13 +161,20 @@ class ReviewStore:
             raise ValueError(f"Invalid review: {error.message}")
         return record
 
-    def save(self, mapping_id, action, correction=None, note=None, elapsed_seconds=None):
+    def save(self, mapping_id, action, correction=None, note=None, elapsed_seconds=None, **tags):
         record = self.build(mapping_id, action, correction, note)
         self.path.parent.mkdir(parents=True, exist_ok=True)
+        entry = self.entries[mapping_id]
+        for passage_id in self.cited_extra(entry, record):
+            if passage_id not in self.saved_passages:
+                with self.passages_path.open("a", encoding="utf-8") as handle:
+                    handle.write(json.dumps({"sap_id": entry["mapping"]["sap_id"], "sap_version": entry["mapping"]["sap_version"],
+                                             "passage": self.extra_passages[passage_id]}, ensure_ascii=False) + "\n")
+                self.saved_passages.add(passage_id)
         with self.path.open("a", encoding="utf-8") as handle:
             handle.write(json.dumps(record, ensure_ascii=False) + "\n")
         self.current[mapping_id] = record
-        self.log_event("saved", mapping_id, action=action, elapsed_seconds=elapsed_seconds)
+        self.log_event("saved", mapping_id, action=action, elapsed_seconds=elapsed_seconds, **tags)
         return record
 
     def log_event(self, event, mapping_id, **fields):
@@ -170,6 +189,19 @@ class ReviewStore:
     def decision(self, mapping_id):
         return self.current.get(mapping_id)
 
+    def cited_extra(self, entry, review):
+        """IDs of reviewer-found passages a review cites, in citation order."""
+        if not review or review["action"] != "correct":
+            return []
+        known = {passage["passage_id"] for passage in entry["retrieval"]["candidates"]}
+        cited = dict.fromkeys(item["passage_id"] for item in review["corrected_assessment"]["evidence"])
+        return [passage_id for passage_id in cited if passage_id not in known and passage_id in self.extra_passages]
+
+    def source_passages(self, entry):
+        """Every passage whose text can back a citation for this entry: retrieved, then reviewer-found."""
+        review = self.decision(entry["mapping"]["mapping_id"])
+        return [*entry["retrieval"]["candidates"], *(self.extra_passages[pid] for pid in self.cited_extra(entry, review))]
+
 
 def resolve(entry, review):
     """Return the action, the assessment that stands after review, and where its evidence came from."""
@@ -181,12 +213,18 @@ def resolve(entry, review):
 
 
 def matrix_rows(entries, reviews):
-    """One row per component and evidence passage, so every quotation keeps its own location."""
+    """One row per component and standing quotation, so every quotation keeps its own location.
+
+    The final_* columns hold only what stands after a reviewer accepted or corrected the mapping. A
+    pending or rejected mapping leaves them empty. The agent's proposal is always in the proposed_*
+    columns, so nothing unreviewed or rejected can be read as approved evidence.
+    """
     for entry in entries:
         component, mapping = entry["component"], entry["mapping"]
         review = reviews.get(mapping["mapping_id"])
         action, assessment, origin = resolve(entry, review)
-        context = component["context"]
+        stands = action in ("accept", "correct")
+        context, proposal = component["context"], mapping["assessment"]
         base = {
             "component_id": component["component_id"], "shell_id": component["shell_id"],
             "shell_version": component["shell_version"], "kind": component["kind"], "label": component["label"],
@@ -195,24 +233,26 @@ def matrix_rows(entries, reviews):
             "treatment_groups": "; ".join(context["treatment_groups"]),
             "surrounding_labels": "; ".join(context["surrounding_labels"]),
             "sap_id": mapping["sap_id"], "sap_version": mapping["sap_version"], "mapping_id": mapping["mapping_id"],
-            "proposed_status": mapping["assessment"]["status"], "review_action": action,
-            # A status stands only once a reviewer accepts or corrects the proposal.
-            "final_status": assessment["status"] if action in ("accept", "correct") else "",
-            "evidence_origin": origin, "rationale": assessment["rationale"],
-            "convention_ids": "; ".join(assessment["convention_ids"]),
-            "open_questions": " | ".join(assessment["open_questions"]),
+            "review_action": action,
+            "final_status": assessment["status"] if stands else "",
+            "final_evidence_origin": origin if stands else "",
+            "final_rationale": assessment["rationale"] if stands else "",
+            "final_convention_ids": "; ".join(assessment["convention_ids"]) if stands else "",
+            "final_open_questions": " | ".join(assessment["open_questions"]) if stands else "",
             "reviewer_note": (review or {}).get("note", ""),
+            "proposed_status": proposal["status"], "proposed_rationale": proposal["rationale"],
+            "proposed_evidence": " | ".join(f"p{item['page']} [{item['section']}] {item['quote']}" for item in proposal["evidence"]),
+            "proposed_convention_ids": "; ".join(proposal["convention_ids"]),
+            "proposed_open_questions": " | ".join(proposal["open_questions"]),
         }
-        evidence = assessment["evidence"] or [None]
+        evidence = (assessment["evidence"] if stands else []) or [None]
         for number, passage in enumerate(evidence, 1):
-            row = dict(base)
-            if passage is None:
-                row.update(evidence_number="", evidence_passage_id="", evidence_section="", evidence_page="",
-                           evidence_quote="", evidence_extraction="")
-            else:
-                row.update(evidence_number=number, evidence_passage_id=passage["passage_id"],
-                           evidence_section=passage["section"], evidence_page=passage["page"],
-                           evidence_quote=passage["quote"], evidence_extraction=passage.get("extraction", "pdf_text"))
+            row = {**base, **{f"final_evidence_{name}": "" for name in FINAL_EVIDENCE}}
+            if passage is not None:
+                row.update(final_evidence_number=number, final_evidence_passage_id=passage["passage_id"],
+                           final_evidence_section=passage["section"], final_evidence_page=passage["page"],
+                           final_evidence_quote=passage["quote"],
+                           final_evidence_extraction=passage.get("extraction", "pdf_text"))
             yield row
 
 
@@ -232,7 +272,7 @@ def matrix_json(entries, reviews):
         records.append({
             "component": entry["component"], "proposal": entry["mapping"], "review": review,
             "review_action": action, "assessment_after_review": assessment if action in ("accept", "correct") else None,
-            "evidence_origin": origin,
+            "evidence_origin": origin if action in ("accept", "correct") else None,
         })
     return json.dumps(records, ensure_ascii=False, indent=2) + "\n"
 

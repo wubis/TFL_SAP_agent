@@ -26,6 +26,8 @@ from pathlib import Path
 import anthropic
 from jsonschema import Draft202012Validator
 
+from traceability import budget
+from traceability.provenance import run_settings
 from traceability.claude_assessor import DEFAULT_MODEL, STATUSES
 from traceability.retrieval import ROOT, extract_pages, read_components, segment_pages, select_family, tokens
 
@@ -204,7 +206,7 @@ def ask(client, model, effort, document, component, constructed, rules, log=None
                 "served_model": response.model, "effort": effort, "system": system, "messages": messages,
                 "stop_reason": response.stop_reason, "output": text, "usage": response.usage.model_dump(),
             }, ensure_ascii=False, default=str) + "\n")
-    return (json.loads(text) if usable else None), response.usage.model_dump()
+    return (json.loads(text) if usable else None), response.usage.model_dump(), response.model
 
 
 def run_baseline(family, components, pages, rules, client, model, effort, log=None):
@@ -218,9 +220,10 @@ def run_baseline(family, components, pages, rules, client, model, effort, log=No
         if component["family_id"] != family["family_id"] or shell is None or shell["linked_sap_id"] != sap.sap_id:
             raise ValueError(f"Component {component['component_id']} does not match the selected SAP")
         constructed = shell["authenticity"] == "constructed"
-        answer, usage = ask(client, model, effort, document, component, constructed, rules, log)
+        answer, usage, served = ask(client, model, effort, document, component, constructed, rules, log)
         entry = to_entry(component, answer, sap, constructed, conventions if constructed else set(), run_id)
         entry["baseline"]["usage"] = usage
+        entry["baseline"]["served_models"] = [served]
         yield entry
 
 
@@ -252,6 +255,7 @@ def main():
     parser.add_argument("--effort", default="medium", choices=("low", "medium", "high", "xhigh", "max"))
     parser.add_argument("--limit", type=int, help="Only the first N components, for a trial run")
     parser.add_argument("--log", type=Path, help="Append the model, full prompt, output, and usage of every call")
+    budget.add_arguments(parser)
     parser.add_argument("--summary", type=Path, help="Write citation accuracy and usage totals to this JSON file")
     args = parser.parse_args()
     try:
@@ -264,15 +268,25 @@ def main():
         if not components or not all(validator.is_valid(component) for component in components):
             raise ValueError("Expected schema-valid component records")
         pages = extract_pages(family["sap"], args.pdf, ocr=args.ocr)
-        entries = []
+        settings = run_settings("llm_baseline", model=args.model, effort=args.effort, tools="none", retries=0, ocr=args.ocr)
+        entries, spend, stopped = [], budget.Budget(args.model, args.max_usd, args.usd_per_mtok), False
         for entry in run_baseline(family, components, pages, rules, anthropic.Anthropic(), args.model, args.effort, args.log):
+            entry["run_settings"] = settings
             entries.append(entry)
             print(json.dumps(entry, ensure_ascii=False), flush=True)
-        report = json.dumps(summarize(entries, args.model, args.effort), indent=1)
+            spend.add(entry["baseline"]["usage"])
+            if spend.exhausted() and len(entries) < len(components):
+                stopped = True
+                break
+        totals = {**summarize(entries, args.model, args.effort), **spend.report(),
+                  "components_not_run": len(components) - len(entries)}
+        report = json.dumps(totals, indent=1)
         if args.summary:
             args.summary.parent.mkdir(parents=True, exist_ok=True)
             args.summary.write_text(report + "\n", encoding="utf-8")
         print(report, file=sys.stderr)
+        if stopped:
+            parser.exit(2, f"Stopped at the spending cap after {len(entries)} of {len(components)} components.\n")
     except TypeError as exc:
         if "authentication method" not in str(exc):
             raise

@@ -27,6 +27,8 @@ from pathlib import Path
 import anthropic
 from jsonschema import Draft202012Validator
 
+from traceability import budget
+from traceability.provenance import run_settings
 from traceability.claude_assessor import DEFAULT_MODEL, STATUSES, clean, handoff, problems, with_searches
 from traceability.mapping import assessment_for
 from traceability.retrieval import (BM25, ROOT, component_query, extract_pages, read_components, segment_pages,
@@ -142,7 +144,7 @@ def trace_component(component, index, constructed, rules, client, model, effort,
                "lookups_available": max_lookups,
                "candidates": [{key: passage[key] for key in SHOWN} for passage in pool.values()]}
     messages = [{"role": "user", "content": json.dumps(payload, ensure_ascii=False, indent=1)}]
-    trace = {"lookups": [], "model_calls": 0, "handed_off": False, "usage": Counter()}
+    trace = {"lookups": [], "model_calls": 0, "handed_off": False, "usage": Counter(), "served_models": []}
     lookups_left, submissions, reasons, nudged, search_requested = max_lookups, 0, [], False, False
     # Each call spends a lookup, a submission attempt, the single nudge, or the single search request, so this bound holds.
     for _ in range(max_lookups + max_submissions + 3):
@@ -152,6 +154,8 @@ def trace_component(component, index, constructed, rules, client, model, effort,
             betas=["server-side-fallback-2026-07-01"], fallbacks="default",
         )
         trace["model_calls"] += 1
+        if response.model not in trace["served_models"]:
+            trace["served_models"].append(response.model)
         usage = response.usage.model_dump()
         trace["usage"].update({key: value for key, value in usage.items()
                                if isinstance(value, int) and not isinstance(value, bool)})
@@ -285,6 +289,7 @@ def main():
     parser.add_argument("--effort", default="medium", choices=("low", "medium", "high", "xhigh", "max"))
     parser.add_argument("--limit", type=int, help="Only the first N components, for a trial run")
     parser.add_argument("--log", type=Path, help="Append the model, full prompt, output, and usage of every call")
+    budget.add_arguments(parser)
     parser.add_argument("--summary", type=Path, help="Write run totals to this JSON file")
     args = parser.parse_args()
     if min(args.top_k, args.max_submissions) < 1 or args.max_lookups < 0:
@@ -299,17 +304,29 @@ def main():
         if not components or not all(validator.is_valid(component) for component in components):
             raise ValueError("Expected schema-valid component records")
         pages = extract_pages(family["sap"], args.pdf, ocr=args.ocr)
-        entries = []
+        settings = run_settings("agent", model=args.model, effort=args.effort, first_candidates=args.top_k,
+                                max_lookups=args.max_lookups, max_submissions=args.max_submissions,
+                                retrieval="BM25", ocr=args.ocr)
+        entries, spend, stopped = [], budget.Budget(args.model, args.max_usd, args.usd_per_mtok), False
         for entry in run_agent(family, components, pages, rules, anthropic.Anthropic(), args.model, args.effort, schema,
                                top_k=args.top_k, max_lookups=args.max_lookups, max_submissions=args.max_submissions,
                                log=args.log):
+            entry["run_settings"] = settings
             entries.append(entry)
             print(json.dumps(entry, ensure_ascii=False), flush=True)
-        report = json.dumps(summarize(entries, args.model, args.effort), indent=1)
+            spend.add(entry["agent"]["usage"])
+            if spend.exhausted() and len(entries) < len(components):
+                stopped = True
+                break
+        totals = {**summarize(entries, args.model, args.effort), **spend.report(),
+                  "components_not_run": len(components) - len(entries)}
+        report = json.dumps(totals, indent=1)
         if args.summary:
             args.summary.parent.mkdir(parents=True, exist_ok=True)
             args.summary.write_text(report + "\n", encoding="utf-8")
         print(report, file=sys.stderr)
+        if stopped:
+            parser.exit(2, f"Stopped at the spending cap after {len(entries)} of {len(components)} components.\n")
     except TypeError as exc:
         if "authentication method" not in str(exc):
             raise

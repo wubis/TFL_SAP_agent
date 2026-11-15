@@ -51,6 +51,33 @@ def test_link_on_wrong_page_or_where_reference_has_none_is_not_matched(entries):
     assert result["complete_components"] == 1
 
 
+def test_unverified_links_never_earn_credit(entries):
+    anchor = "received at least one dose"
+    wrong_text = cited(METHOD, anchor)
+    wrong_text["page"] = 4
+    unknown = {"passage_id": "TEST-SAP-v1:p4:unknown", "page": 4, "section": "4.1", "quote": anchor, "extraction": "pdf_text"}
+    entries[1]["mapping"]["assessment"] = {"status": "supported", "rationale": "x", "convention_ids": [],
+                                           "open_questions": [], "evidence": [unknown, wrong_text]}
+    entries[0]["mapping"]["assessment"]["evidence"] = []
+    result = scorer.report("all", scorer.score(entries, references(), {})["all"])
+    assert (result["proposed_links"], result["matched_links"], result["unverified_links"]) == (2, 0, 2)
+    assert result["matched_anchors"] == 0
+
+
+def test_reviewer_found_passage_counts_only_with_its_saved_text(entries):
+    found = {"passage_id": "TEST-SAP-v1:p4:found", "page": 4, "pdf_page": 5, "section": "4.1", "extraction": "pdf_text",
+             "text": "Participants in the FAS received at least one dose of study treatment.", "score": 1.0}
+    link = {"passage_id": found["passage_id"], "page": 4, "section": "4.1", "quote": "received at least one dose", "extraction": "pdf_text"}
+    mapping_id = entries[1]["mapping"]["mapping_id"]
+    reviews = {mapping_id: {"action": "correct", "corrected_assessment": {
+        "status": "supported", "rationale": "x", "convention_ids": [], "open_questions": [], "evidence": [link]}}}
+    entries[0]["mapping"]["assessment"]["evidence"] = []
+    without = scorer.report("all", scorer.score(entries, references(), {}, reviews)["all"])
+    assert (without["matched_links"], without["unverified_links"]) == (0, 1)
+    saved = scorer.report("all", scorer.score(entries, references(), {}, reviews, {found["passage_id"]: found})["all"])
+    assert (saved["matched_links"], saved["unverified_links"]) == (1, 0)
+
+
 def test_review_decisions_change_what_is_scored(entries):
     mapping_id = entries[1]["mapping"]["mapping_id"]
     corrected = {"status": "supported", "rationale": "x", "convention_ids": [], "open_questions": [],

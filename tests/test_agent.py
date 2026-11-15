@@ -65,7 +65,7 @@ def test_tools_are_strict_and_first_turn_carries_code_retrieved_candidates():
     assert METHOD[0] in [passage["passage_id"] for passage in payload["candidates"]]
     assert result["mapping"]["assessment"]["status"] == "supported"
     assert result["agent"] == {"lookups": [], "model_calls": 1, "handed_off": False,
-                               "usage": {"input_tokens": 100, "output_tokens": 10}}
+                               "usage": {"input_tokens": 100, "output_tokens": 10}, "served_models": ["claude-opus-5-5"]}
 
 
 def test_model_gathers_more_evidence_then_cites_a_passage_it_looked_up():

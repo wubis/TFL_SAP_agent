@@ -63,6 +63,40 @@ def test_bad_requests_are_refused_without_writing(base, body, content_type, mess
     assert not reviews.exists()
 
 
+def test_plan_hides_the_proposal_and_candidates_from_the_page(tmp_path, run_file, entries):
+    ids = [item["component"]["component_id"] for item in entries]
+    plan = tmp_path / "plan.json"
+    plan.write_text(json.dumps({"assignments": {"R1": {ids[0]: "without_proposals", ids[1]: "with_proposals"}},
+                                "order": {"R1": [ids[1], ids[0]]}}))
+    with pytest.raises(ValueError, match="needs --family and --pdf"):
+        make_server(run_file, tmp_path / "reviews.jsonl", port=0, plan=plan, reviewer="R1")
+    with pytest.raises(ValueError, match="not named in the plan"):
+        make_server(run_file, tmp_path / "reviews.jsonl", port=0, plan=plan, reviewer="R9")
+    from traceability.review import ReviewStore, load_run
+    from traceability.reviewer_app import Session, apply_plan
+    loaded, conditions = apply_plan(load_run(run_file), json.loads(plan.read_text()), "R1")
+    store = ReviewStore(tmp_path / "reviews.jsonl", loaded)
+    session = Session(loaded, store, {"families": []}, reviewer="R1", conditions=conditions)
+    shown, hidden = session.state()["entries"]
+    assert shown["component"]["component_id"] == ids[1] and shown["condition"] == "with_proposals"
+    assert hidden["condition"] == "without_proposals" and hidden["retrieval"]["candidates"] == []
+    assert hidden["mapping"]["assessment"]["evidence"] == [] and "supported" not in json.dumps(hidden["mapping"])
+    assert "Least squares" not in json.dumps(hidden)
+    with pytest.raises(ValueError, match="Record your own assessment"):
+        session.save({"mapping_id": hidden["mapping"]["mapping_id"], "action": "accept"}, 3)
+    session.save({"mapping_id": hidden["mapping"]["mapping_id"], "action": "correct",
+                  "correction": {"status": "not_found_in_supplied_sap", "rationale": "Searched for the statistic."}}, 90)
+    session.save({"mapping_id": hidden["mapping"]["mapping_id"], "action": "correct", "correction": {
+        "status": "supported", "rationale": "Own search.",
+        "evidence": [{"passage_id": "TEST-SAP-v1:p9:1", "quote": "Least squares means and standard errors"}]}}, 90)
+    again = Session(loaded, ReviewStore(tmp_path / "reviews.jsonl", loaded), {"families": []}, reviewer="R1", conditions=conditions)
+    reopened = again.state()["entries"][1]
+    assert [passage["passage_id"] for passage in reopened["reviewer_passages"]] == ["TEST-SAP-v1:p9:1"]
+    assert reopened["retrieval"]["candidates"] == []
+    event = json.loads(store.timing_path.read_text().splitlines()[-1])
+    assert (event["reviewer"], event["condition"], event["elapsed_seconds"]) == ("R1", "without_proposals", 90)
+
+
 def test_search_needs_a_sap_index(base):
     status, text = call(base[0] + "/api/search?q=baseline")
     assert status == 400 and "--family and --pdf" in json.loads(text)["error"]

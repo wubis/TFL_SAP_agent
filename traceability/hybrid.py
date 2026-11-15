@@ -73,11 +73,16 @@ class HybridIndex:
         vectors = [unit(vector) for vector in embed(texts)]
         if len(vectors) != len(texts):
             raise ValueError("The embedder returned a different number of vectors than passages")
+        self.dimensions = len(vectors[0])
+        if not self.dimensions or any(len(vector) != self.dimensions for vector in vectors):
+            raise ValueError("The embedder returned vectors of different or zero length")
         self.vectors = dict(zip(self.by_id, vectors, strict=True))
 
     def dense_ranking(self, text, depth):
         query = unit(self.embed([text])[0])
-        scored = sorted(((sum(a * b for a, b in zip(query, vector)), passage_id)
+        if len(query) != self.dimensions:
+            raise ValueError(f"The query vector has {len(query)} dimensions and the passages have {self.dimensions}")
+        scored = sorted(((sum(a * b for a, b in zip(query, vector, strict=True)), passage_id)
                          for passage_id, vector in self.vectors.items()), key=lambda pair: (-pair[0], pair[1]))
         return [passage_id for _, passage_id in scored[:depth]]
 
@@ -123,8 +128,11 @@ def main():
         if not components or args.top_k < 1 or not all(validator.is_valid(component) for component in components):
             raise ValueError("Expected schema-valid component records and a positive top-k")
         pages = extract_pages(family["sap"], args.pdf, ocr=args.ocr)
+        from traceability.provenance import run_settings
+        settings = run_settings("hybrid_retrieval", method="BM25 and embedding ranks, reciprocal rank fusion",
+                                embedder=args.embedder, top_k=args.top_k, ocr=args.ocr)
         for result in retrieve_hybrid(family, components, pages, load_embedder(args.embedder), args.top_k):
-            print(json.dumps(result, ensure_ascii=False))
+            print(json.dumps({**result, "run_settings": settings}, ensure_ascii=False))
     except (OSError, ValueError, KeyError, subprocess.CalledProcessError) as exc:
         parser.exit(1, f"{exc}\n")
 
