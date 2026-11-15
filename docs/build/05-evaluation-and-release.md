@@ -28,6 +28,24 @@ Two differences from the agent's assessor matter when comparing. The baseline re
 
 The baseline's parsing, citation checks, and run-file output are covered by tests with a stand-in client, and the citation check was exercised on the real ANB020-004 SAP text, including a scanned page. It has yet to run against the API, so there are no baseline results.
 
+## Run the evaluation
+
+`benchmark/evaluate.py` scores every system's saved runs for one partition and writes a JSON file and a Markdown report with pooled, per-shell-type, and per-family results.
+
+```sh
+python3 benchmark/evaluate.py --partition development \
+  --retrieval bm25:NCT03469934:runs/bm25-NCT03469934.jsonl \
+  --run agent:NCT03469934:runs/agent-NCT03469934.jsonl \
+  --run llm-baseline:NCT03469934:runs/baseline-NCT03469934.jsonl \
+  --out-json runs/evaluation.json --out-md runs/evaluation.md
+```
+
+For the final evaluation, freeze the settings in `benchmark/evaluation-config.draft.json` into a dated file and pass it with `--partition held_out --frozen-config`. The runner refuses a held-out report unless every system has a run for every held-out family.
+
+`benchmark/reviewer_effort.py --run <run> --reviews <reviews>` summarizes a review session: decisions by action, status changes, links added and removed, and time per component. `benchmark/coverage_report.py` counts what the development records cover.
+
+The current development results, and what is still unmeasured, are in the [evaluation report draft](../evaluation-report.md). Limits are in [known limitations](../limitations.md). The [demo walkthrough](../demo.md) traces one component through review and export.
+
 ## What to build
 
 1. Build a reproducible evaluation runner. Freeze the agent configuration and scoring rules after development. Run keyword search and a general-purpose LLM as baselines using the same source materials and equivalent inputs for each comparison.

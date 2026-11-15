@@ -1,0 +1,15 @@
+{
+  "status": "draft",
+  "note": "Settings the team must review and freeze before the held-out evaluation. Copy to a dated file once frozen and pass that file to benchmark/evaluate.py --frozen-config. Record the git commit of the code at freeze time.",
+  "sap_text": {"extractor": "ghostscript txtwrite", "ocr_for_pages_without_text": true, "ocr_engine": "tesseract --psm 3 at 200 DPI"},
+  "passages": {"window_words": 90, "step_words": 60},
+  "systems": {
+    "keyword_search": {"command": "traceability.retrieval", "method": "BM25", "top_k": [1, 5, 10]},
+    "llm_baseline": {"command": "traceability.llm_baseline", "model": "claude-opus-5-5", "effort": "medium", "tools": "none", "retries": 0},
+    "agent": {"command": "traceability.agent", "model": "claude-opus-5-5", "effort": "medium", "first_candidates": 8,
+              "max_lookups": 6, "max_submissions": 2, "retrieval": "BM25"}
+  },
+  "scoring": {"mapping_scorer": "benchmark/score_development_mappings.py rules, applied by benchmark/evaluate.py",
+              "link_match": "same SAP page and the cited passage window contains the reference anchor",
+              "equivalent_spans": "unmatched links are adjudicated by a human before being counted as unsupported"}
+}

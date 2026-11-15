@@ -70,6 +70,35 @@ The request contains `instructions`, the shell component's `kind`, `label`, and 
 
 The response uses the same assessment fields as the reviewer file, with the component ID assigned by the pipeline. The pipeline checks quotations against retrieved passages, attaches page and section metadata, and validates the status and evidence structure. A timeout, invalid response, or failed citation stops the run before mapping output. A valid response can still require human review for contextual applicability. The adapter has been exercised with a deterministic smoke-test command. Model-backed accuracy is unmeasured.
 
+## Parse the development shells
+
+`traceability.dev_shells` reads the registered authentic shells of each development family and prints component records. ANB020-004 uses the existing PDF readers. APRIL's Appendix Table 3 is read from the SAP PDF. TARVA's Table S4 is read from the supplement, passed with `--shell-file`.
+
+```sh
+python3 -m traceability.dev_shells --family ISRCTN12368131 --pdf /path/to/april-sap.pdf > runs/april-components.jsonl
+
+python3 -m traceability.dev_shells --family NCT02128555 --pdf /path/to/tarva-sap.pdf \
+  --shell-file /path/to/13063_2019_3973_MOESM1_ESM.docx > runs/tarva-components.jsonl
+```
+
+Both new readers reproduce their benchmark inventories exactly: 11 of 11 APRIL components and 7 of 7 TARVA components match on ID, kind, label, and context. Each reader is tied to its registered layout and the slice the manifest selects. Set `TRACEABILITY_SOURCES` to a folder holding the original files to run the reader tests.
+
+## Run the agent
+
+`traceability.agent` is the tool-using agent. Code retrieves the first candidates with BM25. The model then chooses among three lookups, `search_sap`, `read_section`, and `read_page`, and finishes with `submit_assessment`. Code runs each lookup, checks every quotation against the passages the model was shown, and enforces the limits: 6 lookups and 2 submission attempts per component by default. When a limit is reached without a verifiable answer, the component is recorded as `needs_review` with an open question, so the loop always ends with a record.
+
+```sh
+python3 -m traceability.agent --family NCT03469934 --pdf /path/to/SAP_001.pdf --ocr \
+  --components runs/anb-components.jsonl \
+  --log runs/agent-log.jsonl --summary runs/agent-summary.json > runs/agent-run.jsonl
+```
+
+Use `--limit 3` for a trial run. The output is a run file with the passages the model saw, the validated mapping, and a trace of its lookups, so the reviewer interface and the scorers read it directly. The agent may answer `not_found_in_supplied_sap` after searching and must say what it searched for. Its loop, limits, and quotation checks are covered by tests with a stand-in client and its lookups were exercised on the real ANB020-004 SAP. It has yet to run against the API.
+
+## Hybrid retrieval
+
+`traceability.hybrid` combines the BM25 ranking with an embedding ranking by reciprocal rank fusion and writes results in the same shape as the BM25 command, so `score_development_retrieval.py` compares the two. Pass a local model with `--embedder`, for example `fastembed:BAAI/bge-small-en-v1.5`. The fusion is tested with a toy embedder. No embedding model has been run, so there is no hybrid result.
+
 ### Claude assessor
 
 `traceability.claude_assessor` is an assessor command backed by the Anthropic API. Install the `anthropic` package and set `ANTHROPIC_API_KEY` in the environment. It sends the pipeline's instructions as the system prompt and the component, candidates, and conventions as the user message, and asks for a schema-constrained answer. Before answering it checks every quotation against the candidate text and the status rules the pipeline enforces. On a failed check it retries with the failures named, up to `--attempts` calls (default 2), then returns `needs_review` with empty evidence so the run continues and a reviewer takes the component.
