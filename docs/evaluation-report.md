@@ -169,6 +169,34 @@ What these first runs show:
 
 The assessor-only ablation has not been run. Estimated API spend for the live check and these runs is about $9.20, using list prices and counting cache writes at twice the input rate, so the real figure is lower.
 
+### 5.5 One instruction change, checked on 32 components
+
+After those runs the instructions of every system were changed once, with the same wording for each: judge the component's own claim, treat support for the context alone as no support, cite only passages that establish the claim, and send conflicting passages or readings to needs review. The change was made on development data, which is what development data is for.
+
+It was checked on 32 ANB020-004 components: all 15 whose reference is not found, all 5 whose reference is needs review, and 6 supported and 6 partially supported controls drawn at random with a fixed seed. Both systems were rerun on those 32. Files are in `results/development-2026-11-15/instruction-check/`.
+
+| On the same 32 components | Agent before | Agent after | LLM before | LLM after |
+| --- | --- | --- | --- | --- |
+| Status correct | 13 | 17 | 16 | 22 |
+| Reference not found, answered not found | 2/15 | 8/15 | 5/15 | 13/15 |
+| Reference needs review, answered needs review | 0/5 | 0/5 | 0/5 | 0/5 |
+| Supported controls still correct | 6/6 | 6/6 | 5/6 | 6/6 |
+| Partially supported controls still correct | 5/6 | 3/6 | 6/6 | 3/6 |
+| Proposed links | 115 | 57 | 97 | 49 |
+| Links matched to a reference anchor | 34 | 28 | 31 | 25 |
+| Links on components whose reference has no evidence | 49 | 16 | 34 | 5 |
+| Reference anchors found | 31/40 | 29/40 | 28/40 | 27/40 |
+
+The change is kept. It raised status accuracy for both systems, halved the number of links, and cut links on components with no reference evidence by two thirds or more, at a cost of one or two anchors and of some partially supported controls now answered supported.
+
+Three things stand out, and none was tuned further:
+
+- The general-purpose LLM gained more than the agent and is ahead of it on status in this check (22 against 17). With the whole SAP in view it is more willing to conclude that nothing supports a claim.
+- Several of the agent's remaining misses on not-found components are answers of needs review. For a row such as a 95% CI in a descriptive summary, the SAP's general rule for descriptive statistics leaves the CI out. The reference calls that not found. The agent calls it a conflict between the shell and the SAP. The annotation guide does not yet say which is right, and the team should decide before sign-off.
+- Neither system identified the five needs-review references. Four of them are treatment header and legend labels whose rule sits in a scanned appendix.
+
+This check ran 32 components once per system. It shows direction, not a precise effect. Estimated spend for it was $3.38, bringing the running estimate to about $12.60.
+
 ## 6. Reviewer effort
 
 Not yet run. The design the team agreed is a small crossover on development families.

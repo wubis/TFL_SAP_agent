@@ -1,0 +1,26 @@
+{
+ "model": "claude-opus-5-5",
+ "effort": "medium",
+ "components": 32,
+ "handed_off_to_reviewer": 0,
+ "model_calls": 79,
+ "lookups": {
+  "search_sap": 57,
+  "read_page": 5
+ },
+ "statuses": {
+  "partially_supported": 10,
+  "supported": 11,
+  "not_found_in_supplied_sap": 8,
+  "needs_review": 3
+ },
+ "token_usage": {
+  "cache_creation_input_tokens": 223183,
+  "cache_read_input_tokens": 242702,
+  "input_tokens": 222,
+  "output_tokens": 30195
+ },
+ "estimated_usd": 2.4388,
+ "max_usd": 3.0,
+ "components_not_run": 0
+}

@@ -7,7 +7,9 @@ Last updated November 15, 2026.
 ## Not yet measured
 
 - The agent and the general-purpose LLM have each run once on development data. The assessor-only ablation has not run. Results come from one run per system, and model output varies between runs.
-- On development data the agent is level with the general-purpose LLM on status accuracy, abstains less often, and never answers needs review where the reference does.
+- On development data the agent is level with the general-purpose LLM on status accuracy, abstains less often, and never answers needs review where the reference does. After one instruction change, checked on 32 components, both improved and the LLM was ahead on status (22 against 17). The agent's measured advantages are more evidence found and quotations that always verify.
+- The full development set has not been rerun with the changed instructions, so there is no complete before-and-after on all 82 components.
+- The annotation guide does not say whether a shell element that the SAP's general rule leaves out is not found or needs review. The agent and the reference disagree on several such components.
 - SAP text is extracted page by page without regard to columns. On a two-column SAP such as TARVA the columns interleave, passages mix unrelated sentences, and a quotation that is correct in the document may not be contiguous in the extracted text. TAPS-2 in the held-out set has the same layout. The Claude assessor, the tool-using agent, and the general-purpose LLM baseline are written and tested with a stand-in client. Whether the live calls and the model's responses behave as intended, and the accuracy, cost, and run time, are unknown until they run.
 - No person has reviewed a full shell in the reviewer interface, so there is no reviewer time or correction data. The correct, restart, export, and score workflow has been run in a real browser by script on ANB020-004.
 - No unmatched link has been adjudicated.
