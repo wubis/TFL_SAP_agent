@@ -97,6 +97,13 @@ def handoff(reasons):
     }
 
 
+def with_searches(decision, searches):
+    """List the searches behind a not-found answer in the record. A convention-only answer needs none."""
+    if decision["status"] == "not_found_in_supplied_sap" and not decision["convention_ids"]:
+        decision["rationale"] = decision["rationale"].rstrip() + " Searches run: " + "; ".join(searches) + "."
+    return decision
+
+
 def clean(decision):
     decision["open_questions"] = list(dict.fromkeys(q.strip() for q in decision["open_questions"] if q.strip()))
     decision["convention_ids"] = list(dict.fromkeys(decision["convention_ids"]))
@@ -133,7 +140,8 @@ def assess(request, client, model, effort, attempts, log=None):
             with log.open("a", encoding="utf-8") as handle:
                 handle.write(json.dumps(record, ensure_ascii=False, default=str) + "\n")
         if decision is not None and not reasons:
-            return clean(decision)
+            count = len(request["candidates"])
+            return with_searches(clean(decision), [f"keyword retrieval of {count} candidate passages for this component"])
         if decision is None:
             break
         # Keep the full assistant turn, thinking blocks included, and name what failed.

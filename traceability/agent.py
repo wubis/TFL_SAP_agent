@@ -27,7 +27,7 @@ from pathlib import Path
 import anthropic
 from jsonschema import Draft202012Validator
 
-from traceability.claude_assessor import DEFAULT_MODEL, STATUSES, clean, handoff, problems
+from traceability.claude_assessor import DEFAULT_MODEL, STATUSES, clean, handoff, problems, with_searches
 from traceability.mapping import assessment_for
 from traceability.retrieval import (BM25, ROOT, component_query, extract_pages, read_components, segment_pages,
                                     select_family, tokens)
@@ -52,9 +52,11 @@ Finish by calling submit_assessment exactly once.
 - partially_supported: evidence supports a material part and a stated detail remains unsupported. Say what is
   missing in an open question.
 - not_found_in_supplied_sap: after searching for the definitions, rules, and methods the component would rest
-  on, no passage supports it. Evidence must be empty. Say in the rationale what you searched for. Also use it,
-  with the convention ID, for a component that rests only on a supplied display convention. Never cite a SAP
-  passage for a convention.
+  on, no passage supports it. Evidence must be empty. Run at least one lookup before you conclude this, and say
+  in the rationale what support you looked for. Code adds the list of searches to the record. This status
+  records an absence. It is not a finding against the shell.
+- A component that rests only on a supplied display convention takes not_found_in_supplied_sap with the
+  convention ID and no SAP passage. Never cite a SAP passage for a convention.
 - needs_review: the SAP is ambiguous or contradictory for this component, or you ran out of lookups before the
   evidence was sufficient. Cite the competing passages and state the question for a reviewer.
 
@@ -141,9 +143,9 @@ def trace_component(component, index, constructed, rules, client, model, effort,
                "candidates": [{key: passage[key] for key in SHOWN} for passage in pool.values()]}
     messages = [{"role": "user", "content": json.dumps(payload, ensure_ascii=False, indent=1)}]
     trace = {"lookups": [], "model_calls": 0, "handed_off": False, "usage": Counter()}
-    lookups_left, submissions, reasons, nudged = max_lookups, 0, [], False
-    # Each call either spends a lookup, spends a submission attempt, or uses the single nudge, so this bound holds.
-    for _ in range(max_lookups + max_submissions + 2):
+    lookups_left, submissions, reasons, nudged, search_requested = max_lookups, 0, [], False, False
+    # Each call spends a lookup, a submission attempt, the single nudge, or the single search request, so this bound holds.
+    for _ in range(max_lookups + max_submissions + 3):
         response = client.beta.messages.create(
             model=model, max_tokens=16000, system=INSTRUCTIONS, tools=TOOLS, messages=messages,
             output_config={"effort": effort}, cache_control={"type": "ephemeral"},
@@ -185,8 +187,18 @@ def trace_component(component, index, constructed, rules, client, model, effort,
                     reasons = problems(call.input, request)
                 except (KeyError, TypeError, AttributeError):
                     reasons = ["The assessment is missing a required field."]
-                if not reasons and decision is None:
-                    decision = clean(dict(call.input))
+                unsearched = (not reasons and call.input["status"] == "not_found_in_supplied_sap"
+                              and not call.input["convention_ids"] and not trace["lookups"] and lookups_left > 0)
+                if unsearched and not search_requested:
+                    search_requested = True
+                    results.append({"type": "tool_result", "tool_use_id": call.id, "is_error": True,
+                                    "content": "Not found needs a documented search. Run at least one lookup for the "
+                                               "definition, rule, or method this component would rest on, then submit again."})
+                elif not reasons and decision is None:
+                    searches = [f"first keyword retrieval for the component ({top_k} passages)",
+                                *[f"{item['tool']} {json.dumps(next(iter(item['input'].values())), ensure_ascii=False)}"
+                                  for item in trace["lookups"]]]
+                    decision = with_searches(clean(dict(call.input)), searches)
                     results.append({"type": "tool_result", "tool_use_id": call.id, "content": "Recorded."})
                 else:
                     submissions += 1

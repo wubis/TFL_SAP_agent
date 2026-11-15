@@ -63,6 +63,22 @@ def test_valid_answer_returns_after_one_call_and_logs_prompt_and_model(tmp_path)
     assert "exact string match" in record["system"] and record["messages"][0]["role"] == "user"
 
 
+def test_not_found_lists_the_search_and_a_convention_answer_does_not():
+    req = request()
+    found = assess(req, FakeClient(answer("not_found_in_supplied_sap")), "claude-opus-5-5", "medium", 2)
+    assert found["rationale"].endswith("Searches run: keyword retrieval of 3 candidate passages for this component.")
+    req["display_conventions"] = [{"convention_id": "not-applicable-em-dash"}]
+    convention = assess(req, FakeClient(answer("not_found_in_supplied_sap", conventions=["not-applicable-em-dash"])),
+                        "claude-opus-5-5", "medium", 2)
+    assert "Searches run" not in convention["rationale"] and convention["convention_ids"] == ["not-applicable-em-dash"]
+
+
+def test_shared_instructions_allow_not_found_after_a_search():
+    from traceability.assessment import INSTRUCTIONS
+    assert "for a matching project display convention only" not in INSTRUCTIONS
+    assert "lists the searches that were run" in INSTRUCTIONS and "no SAP passage" in INSTRUCTIONS
+
+
 def test_failed_quote_gets_one_retry_naming_the_failure():
     client = FakeClient(WRONG_VISIT_QUOTE, GOOD)
     assert assess(request(), client, "claude-opus-5-5", "medium", 2) == GOOD

@@ -109,7 +109,7 @@ def test_lookup_limit_is_enforced_and_loop_always_ends_with_a_record():
     client = FakeClient(*endless)
     result = run(client, max_lookups=2, max_submissions=1)
     assert len(result["agent"]["lookups"]) == 2
-    assert len(client.calls) == 2 + 1 + 2
+    assert len(client.calls) == 2 + 1 + 3
     assert "No lookups remain" in results_sent(client, 3)[0]["content"]
     assert result["agent"]["handed_off"] and result["mapping"]["assessment"]["status"] == "needs_review"
     assert result["mapping"]["assessment"]["open_questions"]
@@ -133,8 +133,9 @@ def test_abstention_and_run_file_round_trip(tmp_path):
                         [submit("not_found_in_supplied_sap")])
     result = run(client)
     assert result["mapping"]["assessment"] == {
-        "status": "not_found_in_supplied_sap", "rationale": "Checked population, endpoint, visit, and statistic.",
-        "evidence": [], "convention_ids": [], "open_questions": []}
+        "status": "not_found_in_supplied_sap", "evidence": [], "convention_ids": [], "open_questions": [],
+        "rationale": "Checked population, endpoint, visit, and statistic. Searches run: first keyword retrieval "
+                     'for the component (8 passages); search_sap "em dash not applicable cell".'}
     path = tmp_path / "run.jsonl"
     path.write_text(json.dumps(result) + "\n")
     assert len(load_run(path)) == 1
@@ -144,6 +145,21 @@ def test_abstention_and_run_file_round_trip(tmp_path):
 
 def test_convention_is_refused_on_an_authentic_shell():
     answer = submit("not_found_in_supplied_sap", conventions=["not-applicable-em-dash"])
-    client = FakeClient([answer], [submit("not_found_in_supplied_sap")])
+    client = FakeClient([answer], [use("read_page", page=20)], [submit("not_found_in_supplied_sap")])
     run(client)
     assert "was not supplied" in results_sent(client, 1)[0]["content"]
+
+
+def test_not_found_without_a_lookup_is_sent_back_once_and_costs_no_submission():
+    client = FakeClient([submit("not_found_in_supplied_sap")], [use("read_section", heading="9.1")],
+                        [submit("not_found_in_supplied_sap")])
+    result = run(client, max_submissions=1)
+    assert "needs a documented search" in results_sent(client, 1)[0]["content"]
+    assessment = result["mapping"]["assessment"]
+    assert assessment["status"] == "not_found_in_supplied_sap" and not result["agent"]["handed_off"]
+    assert assessment["rationale"].endswith('Searches run: first keyword retrieval for the component (8 passages); read_section "9.1".')
+
+
+def test_not_found_is_accepted_without_lookups_when_none_are_allowed():
+    result = run(FakeClient([submit("not_found_in_supplied_sap")]), max_lookups=0)
+    assert result["mapping"]["assessment"]["status"] == "not_found_in_supplied_sap"

@@ -113,6 +113,7 @@ def test_output_is_a_valid_run_file_the_scorer_can_read(tmp_path):
     report = scorer.report("all", scorer.score(results, references(), {})["all"])
     assert (report["status_correct"], report["matched_links"], report["proposed_links"]) == (2, 3, 3)
     assert (report["complete_components"], report["correct_abstentions"]) == (2, 1)
+    assert results[2]["mapping"]["assessment"]["rationale"].endswith("Searches run: read of the whole supplied SAP text, pages 4 to 11.")
     total = summarize(results, "claude-opus-5-5", "medium")
     assert (total["citations"], total["citation_accuracy"], total["token_usage"]["input_tokens"]) == (3, 1.0, 30)
 

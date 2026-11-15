@@ -165,7 +165,11 @@ def to_entry(component, answer, sap, constructed, conventions, run_id):
                              "section": passage["section"] or "Unidentified section", "quote": quote,
                              "extraction": passage["extraction"]})
         questions = list(dict.fromkeys(q.strip() for q in answer["open_questions"] if q.strip()))
-        assessment = {"status": answer["status"], "rationale": answer["rationale"].strip(), "evidence": evidence,
+        rationale = answer["rationale"].strip()
+        if answer["status"] == "not_found_in_supplied_sap" and not answer["convention_ids"]:
+            numbers = [page for page, _, _, _ in sap.pages]
+            rationale += f" Searches run: read of the whole supplied SAP text, pages {min(numbers)} to {max(numbers)}."
+        assessment = {"status": answer["status"], "rationale": rationale, "evidence": evidence,
                       "convention_ids": list(dict.fromkeys(answer["convention_ids"])), "open_questions": questions}
     entry = {
         "component": component,
