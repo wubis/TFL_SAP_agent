@@ -30,19 +30,26 @@ Six trial families, frozen on November 13, 2026 in the [source manifest](../data
 | Figure | 8 | | not found in the supplied SAP | 16 |
 | | | | needs review | 8 |
 
-| Challenge case countable from the records | Components |
-| --- | ---: |
-| Support that needs more than one passage or claim | 36 |
-| Evidence from more than one SAP section | 25 |
-| Incomplete specification (partially supported) | 23 |
-| Ambiguity or contradiction (needs review) | 8 |
-| Evidence on a scanned page | 6 |
-| Unsupported footnote | 2 |
-| Display convention only | 1 |
+Each reference record can carry `challenge_cases` tags from the proposal's list. Five follow from the record and are filled by `benchmark/challenge_tags.py`. Three need an annotator's judgment and have not been assigned yet.
 
-75 development components come from authentic shells and 7 from the constructed shell. The records do not tag paraphrased labels, similar analyses for different populations, or general rules with endpoint-specific exceptions, so those cases are not counted. Held-out coverage is not reported here because held-out records stay unread until the final evaluation.
+| Challenge case | Development records | How it is tagged |
+| --- | ---: | --- |
+| Evidence across multiple sections | 25 | Derived from the record |
+| Incomplete specification | 23 | Derived from the record |
+| Unsupported footnote | 1 | Derived from the record |
+| Convention-only component | 1 | Derived from the record |
+| Alternative valid passages | 0 | Derived from the record |
+| Paraphrased label | not yet tagged | Annotator |
+| Similar analysis for a different population | not yet tagged | Annotator |
+| General convention with an endpoint-specific exception | not yet tagged | Annotator |
 
-Reference annotations were written and source-audited by AI annotators. ANB020-004 also had a blind second AI annotation, which agreed with the first on 16 of the original 20 statuses before reconciliation. Human sign-off is open.
+Also countable from the records: 36 components need more than one passage or claim, 8 have a needs-review reference status, and 6 have evidence on a scanned page.
+
+Unsupported footnotes, convention-only components, and alternative valid passages have one record or none. The team decided that constructed shells may be written for cases this thin, to a real SAP in a development family, before any agent output is looked at. None has been written yet. 75 development components come from authentic shells and 7 from the constructed shell. Whether that mix is acceptable has not been confirmed with the TA. Held-out coverage is not reported here because held-out records stay unread until the final evaluation.
+
+Six families is the final count unless a new family fills a gap. A rule in the [source notes](../data/README.md#adding-a-family-after-the-freeze) fixes the partition of any added family before its documents are opened.
+
+Reference annotations were written and source-audited by AI annotators. ANB020-004 also had a blind second AI annotation, which agreed with the first on 16 of the original 20 statuses before reconciliation. The proposal asks for reviewed reference links. A second teammate who did not write the annotations signs off each family, a third person or the group settles disagreements, and names and dates are recorded in the manifest. No family is signed off yet, and the held-out evaluation will not run until every held-out family is.
 
 ## 3. Systems
 
@@ -71,7 +78,7 @@ All three may answer not found in the supplied SAP after a documented search, an
 | Citation accuracy | Quotations found verbatim at the cited location. A link whose source passage was not saved, or whose quotation is not in it, is counted as unverified and never matched. | `evaluate.py`, `score_development_mappings.py` |
 | Links that do not substantiate | Unmatched links after adjudication, and links on components whose reference has no evidence | `score_development_mappings.py` |
 | Correct abstention | Reference not-found components answered not found, and those deferred with no link | same |
-| Right context when similar language appears elsewhere | Failure review of wrong population, endpoint, visit, and method links | section 7 |
+| Right context when similar language appears elsewhere | Every measure reported by tagged challenge case, plus the failure review of wrong population, endpoint, visit, and method links | `score_development_mappings.py`, section 7 |
 | Baselines on the same materials | Keyword search and the general-purpose LLM, same SAP pages and components | `evaluate.py` |
 | Reviewer time and corrections | Decisions, status changes, links added and removed, seconds per component | `reviewer_effort.py` |
 | Unsupported links remaining after review | The mapping scorer applied to the assessments that stand after review | `score_development_mappings.py --reviews` |
@@ -133,7 +140,9 @@ ANB020-004, BM25 with OCR, ten candidates: 64/95 anchors and 22/49 complete comp
 
 No model-backed run exists. With no judgments, every mapping is needs review: 0 links, and 5 of 64 ANB020-004 statuses agree with the reference because 5 reference statuses are needs review. That is the floor any system is measured against.
 
-Pending: status accuracy, link precision and recall, complete evidence, citation accuracy, and abstention for the agent, the assessor-only ablation, and the general-purpose LLM, by shell type.
+Pending: status accuracy, link precision and recall, complete evidence, citation accuracy, and abstention for the agent, the assessor-only ablation, and the general-purpose LLM, by shell type and by challenge case.
+
+Before any of those runs, `benchmark/live_check.py` makes a few real calls on development components and checks that the commands finish, that the requested model served every call, that every cited quotation is in the passage it cites, and that prompts and token usage were logged. It has not been run, because no API key is available yet. Tests with a stand-in client cannot show that live calls and real model responses behave as intended.
 
 ## 6. Reviewer effort
 
@@ -146,7 +155,7 @@ Not yet run. The design the team agreed is a small crossover on development fami
 
 `benchmark/crossover_plan.py` builds the assignment from a run file with a fixed seed. On the authentic ANB020-004 shells it drew 8 table, 8 figure, and 8 listing components per reviewer, 12 in each condition. The reviewer interface takes the plan and a reviewer name, and `benchmark/reviewer_effort.py` reports the measures by condition. Time is measured from opening a component to saving it.
 
-The workflow itself was exercised on ANB020-004 through the interface: a correction citing a passage found by search, a restart of the application, export of the matrix, and scoring of the corrected assessment. The cited passage was restored after the restart and both links scored as verified. That run was scripted. No person has done a review session yet.
+The workflow itself was run in a real browser on the 64 ANB020-004 components, with the script in `tests/browser/`. It corrected the table's population label with two candidate passages, corrected the listing's population label with a passage found by searching the SAP, accepted one proposal, and rejected one. The application was then stopped and started again. The decisions, the correction, and the searched passage with its highlighted quotation were all shown again, and the matrix was downloaded from the page. The export had 65 rows, with final evidence only on the corrected rows. Scoring the reviewed assessments gave 3 links, 2 matched to reference anchors, none unverified, and 1 component with complete evidence, against 0 links before review. The run was driven by a script, so it shows the workflow works. No person has done a review session yet.
 
 ## 6a. Adjudicating unmatched links
 

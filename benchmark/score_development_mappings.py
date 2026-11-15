@@ -1,6 +1,6 @@
 """Score proposed or reviewed mappings for a development family against its reference annotations.
 
-Reports, overall and by shell type: support-status accuracy, link precision and recall against the
+Reports, overall, by shell type, and by tagged challenge case: support-status accuracy, link precision and recall against the
 reference citation anchors, complete evidence-group coverage, and abstention on components whose
 reference status is not_found_in_supplied_sap.
 
@@ -67,7 +67,8 @@ def score(entries, references, shell_types, reviews=None, extra_passages=None):
             sources.update({pid: passage["text"] for pid, passage in (extra_passages or {}).items()})
         matched, hits, unverified = matched_reference_ids(assessment, reference, sources)
         expected = reference["assessment"]
-        for name in ("all", shell_types.get(component["shell_id"], "unknown")):
+        cases = [f"case: {tag}" for tag in reference.get("challenge_cases", [])]
+        for name in ("all", shell_types.get(component["shell_id"], "unknown"), *cases):
             tally = groups.setdefault(name, Counter())
             tally["components"] += 1
             tally["status_correct"] += assessment["status"] == expected["status"]

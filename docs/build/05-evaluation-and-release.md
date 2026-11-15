@@ -28,6 +28,16 @@ Two differences from the agent's assessor matter when comparing. The baseline re
 
 The baseline's parsing, citation checks, and run-file output are covered by tests with a stand-in client, and the citation check was exercised on the real ANB020-004 SAP text, including a scanned page. It has yet to run against the API, so there are no baseline results.
 
+## Check the live API first
+
+Before any model-backed evaluation run, make a few real calls and check what comes back. Set `ANTHROPIC_API_KEY` and a spending cap.
+
+```sh
+python3 benchmark/live_check.py --family NCT03469934 --pdf /path/to/SAP_001.pdf --ocr --limit 3 --max-usd 2
+```
+
+It runs the agent, the LLM baseline, and the assessor on the first components of a development family and prints one line per check: the commands finish, there is a valid record per component, settings are recorded, the requested model served every call, every cited quotation is in the passage it cites, and prompts and token usage are logged. It has not been run yet.
+
 ## Run the evaluation
 
 `benchmark/evaluate.py` scores every system's saved runs for one partition and writes a JSON file and a Markdown report with pooled, per-shell-type, and per-family results.
@@ -72,7 +82,9 @@ git tag evaluation-freeze-2026-12-01
 
 Produce one run per system for every held-out family from the tagged commit, using the frozen settings and the system names in the frozen file (`keyword_search`, `llm_baseline`, `agent`). Then pass every run to `benchmark/evaluate.py --partition held_out --frozen-config benchmark/frozen-config-2026-12-01.json`.
 
-Before any held-out reference is opened, the runner checks the frozen file, that the protected files are unchanged, that the commit is tagged, that runs cover exactly the frozen systems and every held-out family, and that each run's recorded settings and code fingerprint equal the frozen ones. It writes `benchmark/final-evaluation-record.json` and will not run again while that record exists. The date above is an example. The team sets the real one.
+Sign off every family's annotations before the freeze with `python3 benchmark/sign_off.py --family <id> --reviewer <name> --date <date>`. `--status` lists the families still open.
+
+Before any held-out reference is opened, the runner checks that every held-out family is signed off by someone other than the annotator, the frozen file, that the protected files are unchanged, that the commit is tagged, that runs cover exactly the frozen systems and every held-out family, and that each run's recorded settings and code fingerprint equal the frozen ones. It writes `benchmark/final-evaluation-record.json` and will not run again while that record exists. The date above is an example. The team sets the real one.
 
 The current development results, and what is still unmeasured, are in the [evaluation report draft](../evaluation-report.md). Limits are in [known limitations](../limitations.md). The [demo walkthrough](../demo.md) traces one component through review and export.
 

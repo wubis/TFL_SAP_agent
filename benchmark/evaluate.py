@@ -15,7 +15,8 @@ frozen configuration written by benchmark/freeze_config.py, no change to code si
 on the current commit, and a run for every held-out family from each system. It then writes
 benchmark/final-evaluation-record.json and refuses to run again while that record exists. Runs must
 cover exactly the systems the frozen configuration names, and each run file's recorded settings
-(model, effort, limits, retrieval, OCR, code commit) must equal the frozen ones.
+(model, effort, limits, retrieval, OCR, code fingerprint) must equal the frozen ones. Every held-out
+family's reference annotations must be signed off in the manifest by someone other than the annotator.
 """
 
 import argparse
@@ -42,6 +43,7 @@ def load(name):
 
 mappings, retrieval = load("score_development_mappings"), load("score_development_retrieval")
 freezing = load("freeze_config")
+signing = load("sign_off")
 RECORD = "benchmark/final-evaluation-record.json"
 
 
@@ -273,6 +275,9 @@ def main():
             problems = freezing.freeze_problems(ROOT, json.loads(args.frozen_config.read_text(encoding="utf-8")))
             if problems:
                 raise ValueError("The held-out evaluation cannot run: " + "; ".join(problems))
+            unsigned = signing.sign_off_problems(manifest, "held_out")
+            if unsigned:
+                raise ValueError("The held-out evaluation cannot run:\n- " + "\n- ".join(unsigned))
             held = sorted(family["family_id"] for family in manifest["families"] if family["partition"] == "held_out")
             problems = held_out_problems(json.loads(args.frozen_config.read_text(encoding="utf-8")), runs, retrievals, held)
             if problems:

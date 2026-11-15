@@ -29,6 +29,8 @@ The source documents are not stored here. Download each from the link in the [so
 | Score and report | `python3 benchmark/evaluate.py` | [Step 5](docs/build/05-evaluation-and-release.md#run-the-evaluation) |
 | Blind check of unmatched links | `python3 benchmark/adjudication.py` | [Step 5](docs/build/05-evaluation-and-release.md#adjudicate-unmatched-links) |
 | Reviewer crossover plan and effort | `python3 benchmark/crossover_plan.py`, `python3 benchmark/reviewer_effort.py` | [Step 4](docs/build/04-reviewer-interface.md#review-with-and-without-proposals) |
+| Tag challenge cases, record sign-off | `python3 benchmark/challenge_tags.py`, `python3 benchmark/sign_off.py` | [Annotation guide](benchmark/annotation-guide.md#tag-challenge-cases) |
+| Check the live API | `python3 benchmark/live_check.py` | [Step 5](docs/build/05-evaluation-and-release.md#check-the-live-api-first) |
 | Freeze before the held-out run | `python3 benchmark/freeze_config.py` | [Step 5](docs/build/05-evaluation-and-release.md#freeze-and-run-the-held-out-evaluation) |
 
 ## Documents

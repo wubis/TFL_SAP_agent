@@ -6,8 +6,8 @@ Last updated November 15, 2026.
 
 ## Not yet measured
 
-- No language-model system has run against the API. The Claude assessor, the tool-using agent, and the general-purpose LLM baseline are written and tested with a stand-in client. Whether the live calls and the model's responses behave as intended, and the accuracy, cost, and run time, are unknown until they run.
-- No person has reviewed a full shell in the reviewer interface, so there is no reviewer time or correction data. The correct, restart, export, and score workflow has been run by script on ANB020-004.
+- No language-model system has run against the API. `benchmark/live_check.py` is ready to check live behavior and has not been run. The Claude assessor, the tool-using agent, and the general-purpose LLM baseline are written and tested with a stand-in client. Whether the live calls and the model's responses behave as intended, and the accuracy, cost, and run time, are unknown until they run.
+- No person has reviewed a full shell in the reviewer interface, so there is no reviewer time or correction data. The correct, restart, export, and score workflow has been run in a real browser by script on ANB020-004.
 - No unmatched link has been adjudicated.
 - Nothing has been run on the held-out families.
 
@@ -16,8 +16,10 @@ Last updated November 15, 2026.
 - The benchmark has six families, at the low end of the 6 to 8 the proposal asks for.
 - In the development partition, figures and listings appear only in ANB020-004. TARVA and APRIL each contribute a slice of one table. Results by shell type on development data rest on one family for two of the three types.
 - One shell is constructed. The others are authentic. The constructed shell holds the only display-convention case.
-- Reference annotations were produced and audited by AI annotators. One family had a blind second AI annotation. Human sign-off is open, and so is independent human adjudication of the held-out labels.
-- The records do not tag paraphrased labels, similar analyses for different populations, or general rules with endpoint-specific exceptions, so coverage of those challenge cases cannot be counted from the data.
+- Reference annotations were produced and audited by AI annotators. One family had a blind second AI annotation. No family has the teammate sign-off the team requires, so the links do not yet meet the proposal's wording of reviewed reference links.
+- Three challenge cases need an annotator's tag and have none yet: paraphrased labels, similar analyses for different populations, and general conventions with endpoint-specific exceptions. Results for those cases cannot be reported until records are tagged. Held-out records carry no tags at all.
+- Unsupported footnotes, convention-only components, and alternative valid passages have one development record or none. No constructed shell has been written for them yet.
+- The acceptable mix of authentic and constructed shells has not been confirmed with the TA.
 - The MARCH-PFIC SAP and shell pairing is inferred from shared identifiers, as the source notes say.
 - Redistribution status is unverified for most sources. The repository stores links and checksums, not the documents.
 

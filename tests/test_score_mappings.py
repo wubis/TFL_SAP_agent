@@ -51,6 +51,17 @@ def test_link_on_wrong_page_or_where_reference_has_none_is_not_matched(entries):
     assert result["complete_components"] == 1
 
 
+def test_results_are_reported_by_tagged_challenge_case(entries):
+    tagged = references()
+    tagged["TEST-TABLE-1:ls-mean"]["challenge_cases"] = ["paraphrased_label", "evidence_across_multiple_sections"]
+    tagged["TEST-TABLE-1:population"]["challenge_cases"] = ["paraphrased_label"]
+    groups = scorer.score(entries, tagged, {"TEST-TABLE-1": "table"})
+    assert sorted(groups) == ["all", "case: evidence_across_multiple_sections", "case: paraphrased_label", "table"]
+    paraphrase = scorer.report("case: paraphrased_label", groups["case: paraphrased_label"])
+    assert (paraphrase["components"], paraphrase["status_correct"], paraphrase["matched_links"]) == (2, 1, 2)
+    assert scorer.report("x", groups["case: evidence_across_multiple_sections"])["complete_components"] == 1
+
+
 def test_unverified_links_never_earn_credit(entries):
     anchor = "received at least one dose"
     wrong_text = cited(METHOD, anchor)

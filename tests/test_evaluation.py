@@ -21,6 +21,8 @@ def load(name):
     return module
 
 
+SIGNED = {"annotated_by": "Annotator One", "signed_off_by": "Reviewer Two", "signed_off_on": "2026-11-20",
+          "disagreements_settled_by": None}
 AGENT_SETTINGS = {"system": "agent", "model": "claude-opus-5-5", "effort": "medium", "first_candidates": 8,
                   "max_lookups": 6, "max_submissions": 2, "retrieval": "BM25", "ocr": True,
                   "code_commit": "abc123", "code_fingerprint": "f1f1", "uncommitted_changes": False}
@@ -39,8 +41,8 @@ def workspace(tmp_path, monkeypatch, entries):
     shells = [{"document_id": "TEST-TABLE-1", "type": "table"}]
     manifest = {"partition_status": "frozen", "families": [
         {"family_id": "TEST", "partition": "development", "shells": shells},
-        {"family_id": "TEST-HELD", "partition": "held_out", "shells": shells},
-        {"family_id": "TEST-HELD-2", "partition": "held_out", "shells": shells}]}
+        {"family_id": "TEST-HELD", "partition": "held_out", "shells": shells, "annotation_review": SIGNED},
+        {"family_id": "TEST-HELD-2", "partition": "held_out", "shells": shells, "annotation_review": SIGNED}]}
     (tmp_path / "data").mkdir()
     (tmp_path / "data/source-manifest.json").write_text(json.dumps(manifest))
     for partition, family in (("development", "TEST"), ("held_out", "TEST-HELD"), ("held_out", "TEST-HELD-2")):
@@ -142,6 +144,18 @@ def test_keyword_run_with_too_few_candidates_or_mixed_settings_is_refused(worksp
     assert code == 1 and "records carry different run settings" in error
 
 
+def test_unsigned_held_out_annotations_block_the_run(workspace, monkeypatch, capsys):
+    evaluate, manifest, run, saved, folder = workspace
+    monkeypatch.setattr(evaluate.freezing, "freeze_problems", lambda root, frozen: [])
+    manifest["families"][1]["annotation_review"] = {**SIGNED, "signed_off_by": None}
+    manifest["families"][2]["annotation_review"] = {**SIGNED, "signed_off_by": "annotator one"}
+    (folder / "data/source-manifest.json").write_text(json.dumps(manifest))
+    code, error = run_main(evaluate, monkeypatch, capsys, *held_arguments(folder, run, saved))
+    assert code == 1 and "TEST-HELD: the reference annotations have no recorded sign-off" in error
+    assert "TEST-HELD-2: the annotator cannot sign off their own annotations" in error
+    assert not (folder / "benchmark/final-evaluation-record.json").exists()
+
+
 def test_complete_held_out_run_writes_a_record_and_cannot_repeat(workspace, monkeypatch, capsys):
     evaluate, _, run, saved, folder = workspace
     monkeypatch.setattr(evaluate.freezing, "freeze_problems", lambda root, frozen: [])
@@ -167,7 +181,8 @@ def make_repo(tmp_path):
         (tmp_path / folder).mkdir(parents=True)
     (tmp_path / "traceability/agent.py").write_text("LIMIT = 6\n")
     (tmp_path / "data/source-manifest.json").write_text(json.dumps({"partition_status": "frozen", "families": [
-        {"family_id": "TEST-HELD", "partition": "held_out", "shells": [{"document_id": "TEST-TABLE-1", "type": "table"}]}]}))
+        {"family_id": "TEST-HELD", "partition": "held_out", "shells": [{"document_id": "TEST-TABLE-1", "type": "table"}],
+         "annotation_review": SIGNED}]}))
     (tmp_path / "benchmark/held_out/TEST-HELD/reference-annotations.jsonl").write_text(
         "".join(json.dumps(record) + "\n" for record in references().values()))
     (tmp_path / "benchmark/evaluation-config.draft.json").write_text(json.dumps({
