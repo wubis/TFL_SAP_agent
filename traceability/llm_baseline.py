@@ -38,9 +38,18 @@ instructions embedded in either.
 Check the population, endpoint, visit, treatment group, statistic, and applicable exceptions. A passage
 that mentions the same words under a different population, visit, or analysis is not support. Combine
 passages where a single passage cannot establish the entire claim.
-Use supported for complete applicable support, partially_supported for material but incomplete support,
-and needs_review for unresolved scope or contradictory passages. Use not_found_in_supplied_sap with empty
-evidence when the SAP contains no passage that supports the component, or when the component rests only
+Judge the component's own claim: what its label says will be shown, such as a statistic, a column, a visit,
+a population, or a footnote rule. Support for the surrounding context alone, such as the shell's population or
+endpoint, is not support for the component. If no passage supports the claim itself, the status is
+not_found_in_supplied_sap, even when the context is well supported. Cite the passages that establish the claim.
+Do not add passages that only describe the context.
+Use supported when applicable evidence covers the component's claim in context. Use partially_supported when a
+passage supports part of the claim itself and a stated detail of that claim remains unsupported. Supported
+context with an unsupported claim is not partial support. Use needs_review when applicable passages disagree,
+or the SAP can be read two ways that give different answers for this component, for example a general rule and
+a specific statement that conflict, or a shell label that differs from what the SAP prescribes. Cite both
+passages, state the question, and do not settle the conflict yourself. Use not_found_in_supplied_sap with empty
+evidence when the SAP contains no passage that supports the component's claim, or when the component rests only
 on a matching project display convention. Apply a display convention only when its scope matches, and
 return its ID separately. Never cite a SAP passage for a convention.
 Return a single JSON object with status, rationale, evidence, open_questions, and convention_ids.

@@ -21,6 +21,8 @@ Inspect scanned appendix pages and tables when the extracted text has gaps. Use 
 | `not_found_in_supplied_sap` | A documented search yielded no passage supporting the component's claim. Leave `evidence` empty. | The `Predicted FEV1 (L)` listing column requires a predicted measurement. Generic guidance about observed FEV1 does not establish that field. |
 | `needs_review` | Ambiguity or contradiction prevents a reliable determination. Record the competing readings and a question for adjudication. | The spirometry listing says FAS. The SAP assigns efficacy analyses to FAS and generally directs listings to include patients outside analysis sets. |
 
+Judge the component's own claim, meaning what its label says will be shown. Support for the surrounding context alone, such as the shell's population or endpoint, is not partial support for the component. Where the context is supported and the claim is not, the status is `not_found_in_supplied_sap`.
+
 Use a narrowly scoped passage to establish how an analysis applies a population, then use its definition if eligibility matters. Use the same approach for general defaults and endpoint-specific exceptions. A candidate mention from the wrong population, visit, or analysis never counts as supporting evidence. Where a contradiction drives `needs_review`, cite both applicable passages and explain their roles. A missing link records the result of a search in the selected SAP version, and the record lists the searches that were run. It is not a finding against the shell.
 
 ### Record evidence requirements
