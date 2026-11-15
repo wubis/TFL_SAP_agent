@@ -114,10 +114,14 @@ class HybridIndex:
         self.dimensions = len(vectors[0])
         if not self.dimensions or any(len(vector) != self.dimensions for vector in vectors):
             raise ValueError("The embedder returned vectors of different or zero length")
+        if not all(math.isfinite(value) for vector in vectors for value in vector):
+            raise ValueError("The embedder returned a vector with a missing or infinite value")
         self.vectors = dict(zip(self.by_id, vectors, strict=True))
 
     def dense_ranking(self, text, depth):
         query = unit(self.embed_query(text))
+        if not all(math.isfinite(value) for value in query):
+            raise ValueError("The query vector has a missing or infinite value")
         if len(query) != self.dimensions:
             raise ValueError(f"The query vector has {len(query)} dimensions and the passages have {self.dimensions}")
         scored = sorted(((sum(a * b for a, b in zip(query, vector, strict=True)), passage_id)

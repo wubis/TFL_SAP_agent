@@ -130,6 +130,11 @@ def main():
             return
         if args.items.exists() or args.key.exists():
             raise ValueError("The items or key file already exists. Choose new paths so rulings are not overwritten")
+        if args.partition == "held_out":
+            # Held-out reference quotations leave the repository here, so this waits for the one final evaluation.
+            record = ROOT / "benchmark/final-evaluation-record.json"
+            if not record.exists() or json.loads(record.read_text(encoding="utf-8")).get("status") != "completed":
+                raise ValueError("Held-out links are adjudicated only after the frozen held-out evaluation has completed")
         manifest = json.loads((ROOT / "data/source-manifest.json").read_text(encoding="utf-8"))
         allowed = {family["family_id"] for family in manifest["families"] if family["partition"] == args.partition}
         runs = []

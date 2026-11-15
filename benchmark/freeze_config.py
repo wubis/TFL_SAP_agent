@@ -22,7 +22,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from traceability.provenance import PROTECTED_PATHS, code_state  # noqa: E402
+from traceability.provenance import PROTECTED_DESCRIPTION, code_state  # noqa: E402
 
 
 def git(root, *arguments):
@@ -41,7 +41,7 @@ def freeze(root, date):
     models = {name: system["model"] for name, system in draft["systems"].items() if "model" in system}
     state = code_state(root)
     frozen = {**draft, "status": "frozen", "frozen_on": date, "code_commit": state["code_commit"],
-              "code_fingerprint": state["code_fingerprint"], "protected_paths": list(PROTECTED_PATHS),
+              "code_fingerprint": state["code_fingerprint"], "protected_paths": PROTECTED_DESCRIPTION,
               "model_identifiers": models,
               "note": "Frozen settings for the held-out evaluation. The limits were set on development families only. "
                       "code_fingerprint covers the protected paths, so later commits that leave them unchanged still match."}
@@ -60,7 +60,7 @@ def freeze_problems(root, frozen):
             return ["Could not read the git history to confirm the freeze"]
         # Compare content, not commit IDs: the commit that adds the frozen file is later than the frozen code.
         if state["code_fingerprint"] != frozen["code_fingerprint"]:
-            found.append("Code, schema, conventions, or manifest changed since the freeze")
+            found.append("Code, schema, benchmark records, manifest, or dependencies changed since the freeze")
         if state["uncommitted_changes"]:
             found.append("There are uncommitted changes to frozen files")
         if not git(root, "tag", "--points-at", "HEAD"):
@@ -68,6 +68,26 @@ def freeze_problems(root, frozen):
     except (subprocess.CalledProcessError, OSError):
         found.append("Could not read the git history to confirm the freeze")
     return found
+
+
+def frozen_file_problems(root, path):
+    """Reasons a frozen configuration file cannot be trusted as the one that was frozen and tagged."""
+    try:
+        relative = Path(path).resolve().relative_to(Path(root).resolve()).as_posix()
+    except ValueError:
+        return ["The frozen configuration must be the file committed in this repository"]
+    if not re.fullmatch(r"benchmark/frozen-config-\d{4}-\d{2}-\d{2}\.json", relative):
+        return ["The frozen configuration must be benchmark/frozen-config-<date>.json, as written by freeze_config.py"]
+    try:
+        if git(root, "status", "--porcelain", "--", relative):
+            return ["The frozen configuration has uncommitted changes or is not committed"]
+        commits = git(root, "log", "--format=%H", "--", relative).split()
+    except (subprocess.CalledProcessError, OSError):
+        return ["Could not read the git history of the frozen configuration"]
+    if len(commits) != 1:
+        return ["The frozen configuration was changed after it was first committed" if commits
+                else "The frozen configuration is not committed"]
+    return []
 
 
 def main():

@@ -80,11 +80,34 @@ git commit -m "Freeze evaluation configuration"
 git tag evaluation-freeze-2026-12-01
 ```
 
-Produce one run per system for every held-out family from the tagged commit, using the frozen settings and the system names in the frozen file (`keyword_search`, `llm_baseline`, `agent`). Then pass every run to `benchmark/evaluate.py --partition held_out --frozen-config benchmark/frozen-config-2026-12-01.json`.
+Sign off every family's annotations before the freeze with `python3 benchmark/sign_off.py --family <id> --reviewer <name> --date <date>`. `--status` lists the families still open. The dates here are examples. The team sets the real ones.
 
-Sign off every family's annotations before the freeze with `python3 benchmark/sign_off.py --family <id> --reviewer <name> --date <date>`. `--status` lists the families still open.
+Produce one run per system for every held-out family from the tagged commit, using the frozen settings and the system names in the frozen file (`keyword_search`, `llm_baseline`, `agent`). Then pass every run and every held-out SAP PDF to the runner:
 
-Before any held-out reference is opened, the runner checks that every held-out family is signed off by someone other than the annotator, the frozen file, that the protected files are unchanged, that the commit is tagged, that runs cover exactly the frozen systems and every held-out family, and that each run's recorded settings and code fingerprint equal the frozen ones. It writes `benchmark/final-evaluation-record.json` and will not run again while that record exists. The date above is an example. The team sets the real one.
+```sh
+python3 benchmark/evaluate.py --partition held_out \
+  --frozen-config benchmark/frozen-config-2026-12-01.json \
+  --run agent:<family>:<run file> --run llm_baseline:<family>:<run file> \
+  --retrieval keyword_search:<family>:<results file> \
+  --pdf <family>:<SAP PDF> \
+  --out-json runs/held-out.json --out-md runs/held-out.md
+```
+
+Before any held-out reference is opened, the runner checks all of the following and lists every problem it finds:
+
+- The frozen file is `benchmark/frozen-config-<date>.json` in this repository, committed, and never edited since it was first committed.
+- The protected files have the same content as at the freeze, with no uncommitted change, and the current commit is tagged. Protected files are the `traceability` package, the schema, every script and record under `benchmark` including the reference annotations, the manifest, and `requirements.txt`. Documentation is not protected.
+- Every held-out family's annotations are signed off by someone other than the annotator.
+- Runs were given for exactly the systems the frozen file names, one per held-out family.
+- Each run file's recorded model, effort, limits, retrieval, OCR setting, and code fingerprint equal the frozen ones, the run was not limited to a subset, and the frozen model served every call.
+- Each run covers exactly the components in the family's inventory.
+- A SAP PDF was supplied for every family, and the output paths can be written.
+
+It then writes `benchmark/final-evaluation-record.json` with status `started`, opens the references, and updates the record to `completed` with the full results, or to `failed after references were opened`. In either case it will not run again while the record exists, and a rerun is a team decision. A failure message names no held-out component.
+
+With `--pdf`, quotations are checked against the SAP page text, and passage text is rebuilt from the SAP, so nothing a run file or a reviewer's saved passage claims is taken on trust. `benchmark/score_development_mappings.py` takes the same option. Held-out links can be exported for adjudication only after the record shows `completed`.
+
+These checks guard against mistakes. They cannot stop someone who edits the checks themselves, so the tagged commit and the record are the audit trail.
 
 The current development results, and what is still unmeasured, are in the [evaluation report draft](../evaluation-report.md). Limits are in [known limitations](../limitations.md). The [demo walkthrough](../demo.md) traces one component through review and export.
 

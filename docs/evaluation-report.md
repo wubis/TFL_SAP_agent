@@ -75,7 +75,7 @@ All three may answer not found in the supplied SAP after a documented search, an
 | All required passages found | Components whose every evidence group is covered | same |
 | Equivalent valid spans | Unmatched links ruled on blind by a person who built none of the systems, before they count as unsupported | `adjudication.py` |
 | Support-status classification | Status accuracy and the reference-to-proposed confusion table | same |
-| Citation accuracy | Quotations found verbatim at the cited location. A link whose source passage was not saved, or whose quotation is not in it, is counted as unverified and never matched. | `evaluate.py`, `score_development_mappings.py` |
+| Citation accuracy | Quotations found verbatim at the cited location. With the SAP PDF supplied, the check is against the SAP page text and passage text is rebuilt from the SAP. A link whose source passage is missing, or whose quotation is not in it, is counted as unverified and never matched. | `evaluate.py`, `score_development_mappings.py` |
 | Links that do not substantiate | Unmatched links after adjudication, and links on components whose reference has no evidence | `score_development_mappings.py` |
 | Correct abstention | Reference not-found components answered not found, and those deferred with no link | same |
 | Right context when similar language appears elsewhere | Every measure reported by tagged challenge case, plus the failure review of wrong population, endpoint, visit, and method links | `score_development_mappings.py`, section 7 |
@@ -166,7 +166,7 @@ Not yet run. A link the scorer leaves unmatched may still be an equivalent valid
 3. A second person rules on every unsure row, with a reason.
 4. `benchmark/adjudication.py apply` checks that every ruling has a reason and a name and reports the rulings per system.
 
-The procedure is run on development runs first so it is settled, then once on the held-out runs after the freeze. A link that fails quotation verification is already unsupported and is not sent for adjudication.
+The procedure is run on development runs first so it is settled, then once on the held-out runs. Held-out links can be exported only after the final evaluation record shows it completed. A link that fails quotation verification is already unsupported and is not sent for adjudication. A baseline quotation that crosses a paragraph break is given a source span cut from the page, so it is verified and adjudicated like any other link.
 
 ## 7. Failure review
 
@@ -190,7 +190,16 @@ Not run. One person runs it once. The team will set the freeze date several days
 3. From the tagged commit, produce one run per system for every held-out family.
 4. `python3 benchmark/evaluate.py --partition held_out --frozen-config <file>` with every run.
 
-Before it opens any held-out reference, the runner checks that the configuration is a frozen file, that the protected files are unchanged since the freeze, that the current commit is tagged, that runs were given for exactly the systems the frozen configuration names and for every held-out family, and that each run file's recorded model, effort, limits, retrieval, OCR setting, and code fingerprint equal the frozen ones. It then writes `benchmark/final-evaluation-record.json` and refuses to run again while that record exists. The fingerprint depends only on the protected files, so runs made after the frozen file is committed still match.
+Before it opens any held-out reference, the runner checks that:
+
+- the frozen file is the one committed in the repository and was never edited after it was committed;
+- the protected files are unchanged since the freeze and the current commit is tagged. They are the agent package, the schema, every benchmark script and record including the reference annotations, the manifest, and the pinned dependencies;
+- every held-out family's annotations are signed off by someone other than the annotator;
+- runs were given for exactly the systems the frozen file names, one per held-out family, each covering exactly the components in the inventory;
+- each run file's recorded model, effort, limits, retrieval, OCR setting, and code fingerprint equal the frozen ones, and the frozen model served every call;
+- the SAP PDF was supplied for every family, so quotations and passage text are checked against the source and not against what a run file claims.
+
+It writes `benchmark/final-evaluation-record.json` before the references are opened and updates it with the full results. Whether the run completes or fails after that point, it will not run again while the record exists. The fingerprint depends only on the protected files, so runs made after the frozen file is committed still match. These checks guard against mistakes. They cannot stop someone who edits the checks themselves.
 
 ## 9. Reproducing these results
 

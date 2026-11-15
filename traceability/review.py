@@ -116,12 +116,21 @@ class ReviewStore:
         self.saved_passages = set(self.extra_passages)
         self.current = {}
         if self.path.exists():
+            known = {entry["mapping"]["mapping_id"]: {passage["passage_id"] for passage in entry["retrieval"]["candidates"]}
+                     for entry in entries}
             for number, record in enumerate(read_jsonl(self.path), 1):
                 error = next(self.validator.iter_errors(record), None)
                 if error is not None:
                     raise ValueError(f"{self.path.name} line {number}: invalid review ({error.message})")
                 if record["mapping_id"] in self.entries:
                     self.current[record["mapping_id"]] = record
+            for mapping_id, record in self.current.items():
+                cited = [item["passage_id"] for item in record.get("corrected_assessment", {}).get("evidence", [])]
+                lost = [passage_id for passage_id in cited
+                        if passage_id not in known[mapping_id] and passage_id not in self.extra_passages]
+                if lost:
+                    raise ValueError(f"{self.path.name}: a correction cites {len(lost)} passage(s) whose text is not in the "
+                                     f"run file or in {self.passages_path.name}. Restore that file so the citation can be audited")
 
     def add_passages(self, passages):
         """Register SAP passages found by reviewer search so a correction can cite them."""

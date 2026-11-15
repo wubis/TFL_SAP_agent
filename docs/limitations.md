@@ -36,6 +36,9 @@ Last updated November 15, 2026.
 - Hybrid retrieval did not help on development data. With a small general embedding model it covered 35 of 66 components at ten candidates, and with MedCPT 29. Two models were tried, with untuned fusion settings, on three families.
 - Adding OCR passages raised anchors found from 83 to 84 of 120 and lowered complete components from 39 to 36, because scanned passages displaced text-layer passages at the cutoff.
 - A proposed link is matched to a reference anchor at passage level: same page, and the cited 90-word window contains the anchor. A correct quotation from another sentence in that window counts as matched. A valid equivalent span on another page counts as unmatched until a person checks it.
+- The held-out gates and the code fingerprint guard against mistakes such as a changed setting, a missing system, or a late edit. They cannot stop someone who edits the checking code itself. The tagged commit and the evaluation record are the audit trail.
+- Checking quotations against the SAP PDF re-extracts the text. A different Ghostscript or Tesseract version from the one a run used can extract slightly different text and turn a true quotation into an unverified one. Use the same tool versions for the runs and the evaluation.
+- Without a PDF, the scorer checks quotations against the passage text in the run file and in a reviewer's saved passages, and takes that text as given.
 - Quotation checks are exact string matches after whitespace normalization. They confirm the words exist in the cited passage. They do not confirm the passage applies to the component.
 - Page numbers are SAP-internal. The manifest records how they map to PDF pages for each family.
 
@@ -54,6 +57,7 @@ Last updated November 15, 2026.
 - The matrix exports as CSV and JSON. There is no PDF or Word export.
 - The shell page image is shown only for shells that sit on a single page of the supplied PDF. TARVA's shell is a Word supplement and has no image.
 - Without proposals, a reviewer can cite only passages found through the search box, which is keyword search over the same passages the agent uses.
+- The page's export leaves out proposals a reviewer was not shown. The command-line export includes them, so run it only after the review session.
 
 ## Environment
 

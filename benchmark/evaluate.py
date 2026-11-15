@@ -24,6 +24,7 @@ import datetime
 import hashlib
 import importlib.util
 import json
+import subprocess
 import sys
 from collections import Counter
 from pathlib import Path
@@ -47,19 +48,20 @@ signing = load("sign_off")
 RECORD = "benchmark/final-evaluation-record.json"
 
 
-def citation_counts(entries):
-    """Quotations found in the passage they cite. The baseline records its own page-level check."""
+def citation_counts(entries, sap=None):
+    """Quotations found where they are cited.
+
+    With the SAP at hand, a quotation counts when it occurs in the SAP text of the cited page. Without
+    it, the check is against the passage text in the run file. A run file's own claims are never used.
+    """
     counts = Counter()
     for entry in entries:
-        if "baseline" in entry:
-            for check in entry["baseline"]["citations"]:
-                counts["citations"] += 1
-                counts["verified_citations"] += check["outcome"] == "verified"
-            continue
         texts = {passage["passage_id"]: passage["text"] for passage in entry["retrieval"]["candidates"]}
         for link in entry["mapping"]["assessment"]["evidence"]:
+            quote = " ".join(link["quote"].split())
+            where = sap[1].get(link["page"], "") if sap else texts.get(link["passage_id"], "")
             counts["citations"] += 1
-            counts["verified_citations"] += link["quote"] in texts.get(link["passage_id"], "")
+            counts["verified_citations"] += quote in where
     return counts
 
 
@@ -100,28 +102,55 @@ def setting_mismatches(system, settings, frozen):
         found.append("the run was produced by code that differs from the frozen code")
     if settings.get("uncommitted_changes") is not False:
         found.append("the run was produced with uncommitted code changes")
+    if settings.get("limit") is not None:
+        found.append(f"the run was limited to its first {settings['limit']} components")
     return found
 
 
-def held_out_problems(frozen, runs, retrievals, held):
+def held_out_problems(frozen, runs, retrievals, held, inventory=None):
     """Everything wrong with a held-out submission, found without opening any reference file."""
     problems = []
     given = {}
     for system, family_id, path in runs:
-        given.setdefault(system, []).append((family_id, recorded_settings(load_run(path), path)))
+        entries = load_run(path)
+        settings = recorded_settings(entries, path)
+        other = sorted(set(served_models(entries)) - {(settings or {}).get("model")})
+        if other:
+            problems.append(f"{system} on {family_id}: calls were served by {', '.join(other)}, not the frozen model")
+        given.setdefault(system, []).append((family_id, settings, {entry["component"]["component_id"] for entry in entries}))
     for system, family_id, path in retrievals:
-        records = list(retrieval.read_records(path).values())
-        given.setdefault(system, []).append((family_id, recorded_settings(records, path)))
+        records = retrieval.read_records(path)
+        given.setdefault(system, []).append((family_id, recorded_settings(list(records.values()), path), set(records)))
     roster = sorted(frozen["systems"])
     if sorted(given) != roster:
         problems.append(f"the frozen configuration names systems {roster}, and runs were given for {sorted(given)}")
     for system, files in sorted(given.items()):
-        if sorted(family for family, _ in files) != held:
+        if sorted(family for family, _, _ in files) != held:
             problems.append(f"{system} needs exactly one run for every held-out family")
-        if system in frozen["systems"]:
-            for family_id, settings in files:
+        for family_id, settings, component_ids in files:
+            if system in frozen["systems"]:
                 problems += [f"{system} on {family_id}: {issue}" for issue in setting_mismatches(system, settings, frozen)]
+            # The component inventory is an input, not an answer. A partial or padded run is caught here.
+            expected = (inventory or {}).get(family_id)
+            if expected is not None and component_ids != expected:
+                problems.append(f"{system} on {family_id}: the run has {len(component_ids)} components and does not "
+                                f"cover exactly the {len(expected)} in the inventory")
     return problems
+
+
+def writable_problems(paths):
+    """Output paths that cannot be written, found before the single held-out run is spent."""
+    found = []
+    for path in paths:
+        if path is None:
+            continue
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            with path.open("a", encoding="utf-8"):
+                pass
+        except OSError as exc:
+            found.append(f"cannot write {path}: {exc.strerror or exc}")
+    return found
 
 
 def parse_triples(values, label):
@@ -134,7 +163,7 @@ def parse_triples(values, label):
     return triples
 
 
-def evaluate(manifest, partition, runs, retrievals):
+def evaluate(manifest, partition, runs, retrievals, pdfs=None):
     families = {family["family_id"]: family for family in manifest["families"] if family["partition"] == partition}
     references = {}
 
@@ -147,23 +176,32 @@ def evaluate(manifest, partition, runs, retrievals):
         return references[family_id]
 
     results = {"partition": partition, "systems": {}, "retrieval": {}, "run_settings": {}}
+    sap_text = {}
     for system, family_id, path in runs:
         entries = load_run(path)
         results["run_settings"].setdefault(system, {})[family_id] = {
             "settings": recorded_settings(entries, path), "served_models": served_models(entries)}
         shell_types = {shell["document_id"]: shell["type"] for shell in families.get(family_id, {}).get("shells", [])}
-        groups = mappings.score(entries, reference(family_id), shell_types)
-        record = results["systems"].setdefault(system, {"families": {}, "pooled": {}, "citations": Counter()})
+        if family_id not in families:
+            raise ValueError(f"{family_id} is not a {partition} family in the frozen manifest")
+        if family_id in (pdfs or {}) and family_id not in sap_text:
+            sap_text[family_id] = mappings.sap_sources(families[family_id], pdfs[family_id])
+        sap = sap_text.get(family_id)
+        groups = mappings.score(entries, reference(family_id), shell_types, sap=sap)
+        record = results["systems"].setdefault(system, {"families": {}, "pooled": {}, "citations": Counter(),
+                                                         "checked_against": set()})
         if family_id in record["families"]:
             raise ValueError(f"Two runs were given for {system} on {family_id}")
         record["families"][family_id] = mappings.report(family_id, groups["all"])
         for name, tally in groups.items():
             record["pooled"].setdefault(name, Counter()).update(tally)
-        record["citations"].update(citation_counts(entries))
+        record["citations"].update(citation_counts(entries, sap))
+        record["checked_against"].add("the SAP PDF" if sap else "passage text in the run file")
     for record in results["systems"].values():
         record["pooled"] = {name: mappings.report(name, tally) for name, tally in sorted(record["pooled"].items())}
         counts = record.pop("citations")
         record["citation_accuracy"] = {
+            "checked_against": sorted(record.pop("checked_against")),
             "citations": counts["citations"], "verified": counts["verified_citations"],
             "rate": round(counts["verified_citations"] / counts["citations"], 3) if counts["citations"] else None}
     for system, family_id, path in retrievals:
@@ -221,6 +259,8 @@ def markdown(results, frozen=None):
                     f"{row['links_where_reference_has_none']} | "
                     f"{fraction(row['correct_abstentions'], row['reference_not_found'])} | "
                     f"{fraction(cited['verified'], cited['citations']) if name == 'all' else ''} |")
+        for system, record in results["systems"].items():
+            lines.append(f"\nQuotations for {system} were checked against {' and '.join(record['citation_accuracy']['checked_against'])}.")
         lines += ["", "### Status confusion, reference to proposed", ""]
         for system, record in results["systems"].items():
             confusion = record["pooled"]["all"]["status_confusion_reference_to_proposed"]
@@ -238,7 +278,8 @@ def markdown(results, frozen=None):
         requested = {(record["settings"] or {}).get("model") for record in families.values()}
         other = sorted({model for record in families.values() for model in record["served_models"]} - requested)
         if other:
-            lines.append(f"- {system}: some calls were served by {', '.join(other)}, not the requested model.")
+            lines.append(f"- {system}: some calls were served by {', '.join(other)}, not the requested model. "
+                         "Results for this system mix models.")
     lines.append("")
     for system, families in results["families_scored"].items():
         missing = sorted(set(results["partition_families"]) - set(families))
@@ -252,50 +293,81 @@ def main():
     parser.add_argument("--partition", choices=("development", "held_out"), required=True)
     parser.add_argument("--run", action="append", help="SYSTEM:FAMILY_ID:PATH to a run file. Repeat as needed.")
     parser.add_argument("--retrieval", action="append", help="SYSTEM:FAMILY_ID:PATH to retrieval results. Repeat as needed.")
+    parser.add_argument("--pdf", action="append", help="FAMILY_ID:PATH to the original SAP PDF. Quotations and passage text "
+                                                       "are then checked against the SAP. Required for held_out.")
     parser.add_argument("--frozen-config", type=Path, help="Settings frozen after development. Required for held_out.")
     parser.add_argument("--out-json", type=Path)
     parser.add_argument("--out-md", type=Path)
     args = parser.parse_args()
+    held_out = args.partition == "held_out"
+    record_path = ROOT / RECORD
     try:
         runs, retrievals = parse_triples(args.run, "--run"), parse_triples(args.retrieval, "--retrieval")
         if not runs and not retrievals:
             raise ValueError("Give at least one --run or --retrieval")
+        pdfs = {}
+        for value in args.pdf or []:
+            family_id, _, path = value.partition(":")
+            if not family_id or not path:
+                raise ValueError(f"--pdf expects FAMILY_ID:PATH, got {value!r}")
+            pdfs[family_id] = Path(path)
         manifest = json.loads((ROOT / "data/source-manifest.json").read_text(encoding="utf-8"))
         if manifest["partition_status"] != "frozen":
             raise ValueError("The partition manifest is not frozen")
         frozen = None
         if args.frozen_config:
             frozen = {"path": str(args.frozen_config), "sha256": hashlib.sha256(args.frozen_config.read_bytes()).hexdigest()}
-        if args.partition == "held_out":
+        if held_out:
             # Every gate is checked before any held-out reference is opened.
             if frozen is None:
                 raise ValueError("The held-out evaluation requires --frozen-config")
-            if (ROOT / RECORD).exists():
-                raise ValueError(f"The held-out evaluation has already been run. See {RECORD}")
-            problems = freezing.freeze_problems(ROOT, json.loads(args.frozen_config.read_text(encoding="utf-8")))
-            if problems:
-                raise ValueError("The held-out evaluation cannot run: " + "; ".join(problems))
-            unsigned = signing.sign_off_problems(manifest, "held_out")
-            if unsigned:
-                raise ValueError("The held-out evaluation cannot run:\n- " + "\n- ".join(unsigned))
+            if record_path.exists():
+                status = json.loads(record_path.read_text(encoding="utf-8")).get("status", "completed")
+                raise ValueError(f"The held-out evaluation has already been run (status: {status}). See {RECORD}. "
+                                 "It runs once. A rerun is a team decision.")
+            config = json.loads(args.frozen_config.read_text(encoding="utf-8"))
             held = sorted(family["family_id"] for family in manifest["families"] if family["partition"] == "held_out")
-            problems = held_out_problems(json.loads(args.frozen_config.read_text(encoding="utf-8")), runs, retrievals, held)
+            inventory = {}
+            for family_id in held:
+                path = ROOT / "benchmark" / "held_out" / family_id / "components.jsonl"
+                inventory[family_id] = {record["component_id"] for record in read_jsonl(path)}
+            problems = [*freezing.frozen_file_problems(ROOT, args.frozen_config), *freezing.freeze_problems(ROOT, config)]
+            if not problems:
+                problems = [*signing.sign_off_problems(manifest, "held_out"),
+                            *held_out_problems(config, runs, retrievals, held, inventory),
+                            *[f"{family_id}: give the original SAP PDF with --pdf so quotations are checked against the source"
+                              for family_id in held if family_id not in pdfs and runs],
+                            *writable_problems([args.out_json, args.out_md])]
             if problems:
                 raise ValueError("The held-out evaluation cannot run:\n- " + "\n- ".join(problems))
-        results = evaluate(manifest, args.partition, runs, retrievals)
-        if args.partition == "held_out":
-            (ROOT / RECORD).write_text(json.dumps({
-                "ran_at": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds"),
-                "frozen_config": frozen, "code_commit": freezing.git(ROOT, "rev-parse", "HEAD"),
-                "systems": results["families_scored"]}, indent=1) + "\n", encoding="utf-8")
-        results["frozen_config"] = frozen
-        report = markdown(results, frozen)
+            # From here references are opened, so the single run is spent whatever happens next.
+            record = {"status": "started", "started_at": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds"),
+                      "frozen_config": frozen, "code_commit": freezing.git(ROOT, "rev-parse", "HEAD"),
+                      "systems": sorted({name for name, _, _ in [*runs, *retrievals]})}
+            record_path.write_text(json.dumps(record, indent=1) + "\n", encoding="utf-8")
+            try:
+                results = evaluate(manifest, args.partition, runs, retrievals, pdfs)
+            except Exception as exc:
+                record.update(status="failed after references were opened", error_type=type(exc).__name__)
+                record_path.write_text(json.dumps(record, indent=1) + "\n", encoding="utf-8")
+                # The message is withheld: it can name held-out components.
+                parser.exit(1, f"The held-out evaluation failed after references were opened ({type(exc).__name__}). "
+                               f"{RECORD} marks the run as spent. A rerun is a team decision.\n")
+            results["frozen_config"] = frozen
+            report = markdown(results, frozen)
+            # The record holds the full results, so nothing is lost if an output file cannot be written.
+            record.update(status="completed", systems=results["families_scored"], results=results)
+            record_path.write_text(json.dumps(record, indent=1) + "\n", encoding="utf-8")
+        else:
+            results = evaluate(manifest, args.partition, runs, retrievals, pdfs)
+            results["frozen_config"] = frozen
+            report = markdown(results, frozen)
+        print(report, end="")
         for path, text in ((args.out_json, json.dumps(results, indent=1) + "\n"), (args.out_md, report)):
             if path:
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_text(text, encoding="utf-8")
-        print(report, end="")
-    except (OSError, ValueError, KeyError) as exc:
+    except (OSError, ValueError, KeyError, subprocess.CalledProcessError) as exc:
         parser.exit(1, f"{exc}\n")
 
 

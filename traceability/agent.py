@@ -306,7 +306,7 @@ def main():
         pages = extract_pages(family["sap"], args.pdf, ocr=args.ocr)
         settings = run_settings("agent", model=args.model, effort=args.effort, first_candidates=args.top_k,
                                 max_lookups=args.max_lookups, max_submissions=args.max_submissions,
-                                retrieval="BM25", ocr=args.ocr)
+                                retrieval="BM25", ocr=args.ocr, limit=args.limit)
         entries, spend, stopped = [], budget.Budget(args.model, args.max_usd, args.usd_per_mtok), False
         for entry in run_agent(family, components, pages, rules, anthropic.Anthropic(), args.model, args.effort, schema,
                                top_k=args.top_k, max_lookups=args.max_lookups, max_submissions=args.max_submissions,

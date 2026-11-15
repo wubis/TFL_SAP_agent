@@ -97,14 +97,30 @@ class Sap:
         return "\n\n".join(parts)
 
     def check(self, page, quote):
-        """Classify one citation and return the agent passage window that best contains it."""
+        """Classify one citation. For a verified one, return a source passage that contains the quotation.
+
+        The passage is the agent's own window when the quotation sits inside one. A quotation that
+        crosses windows or paragraphs gets a span of the same size cut from the page around it, so it
+        is scored and adjudicated like any other verified link.
+        """
         quote = " ".join(quote.split())
-        if quote and quote in self.text.get(page, ""):
-            terms = Counter(tokens(quote))
-            best = max(self.windows.get(page, []), default=None,
-                       key=lambda window: (quote in window.text, sum((terms & Counter(tokens(window.text))).values())))
-            return "verified", best
-        elsewhere = sorted(other for other, text in self.text.items() if quote and quote in text)
+        text = self.text.get(page, "")
+        if quote and quote in text:
+            inside = next((window for window in self.windows.get(page, []) if quote in window.text), None)
+            if inside is not None:
+                return "verified", {"passage_id": inside.passage_id, "section": inside.section, "text": inside.text,
+                                    "extraction": inside.extraction}
+            words, before = text.split(), len(text[:text.index(quote)].split())
+            room = max(0, 90 - len(quote.split())) // 2
+            # Whole words either side, then widen to the nearest word boundaries that still contain the quotation.
+            start, end = max(0, before - room - 1), min(len(words), before + len(quote.split()) + room + 1)
+            span = " ".join(words[start:end])
+            if quote not in span:
+                span = quote
+            method = next(m for number, _, _, m in self.pages if number == page)
+            return "verified", {"passage_id": f"{self.sap_id}:p{page}:span:{start}", "section": None, "text": span,
+                                "extraction": method}
+        elsewhere = sorted(other for other, other_text in self.text.items() if quote and quote in other_text)
         return ("on_another_page" if elsewhere else "not_found"), None
 
 
@@ -147,14 +163,7 @@ def to_entry(component, answer, sap, constructed, conventions, run_id):
                 continue
             seen.add((item["page"], quote))
             if window is not None:
-                passage = {"passage_id": window.passage_id, "page": window.page, "pdf_page": window.pdf_page,
-                           "section": window.section, "text": window.text, "extraction": window.extraction, "score": 0.0}
-            elif outcome == "verified":
-                # The page has no passage window, so cite the page text itself.
-                method = next(m for page, _, _, m in sap.pages if page == item["page"])
-                passage = {"passage_id": f"{sap.sap_id}:p{item['page']}:page", "page": item["page"],
-                           "pdf_page": sap.pdf_page[item["page"]], "section": None,
-                           "text": sap.text[item["page"]], "extraction": method, "score": 0.0}
+                passage = {**window, "page": item["page"], "pdf_page": sap.pdf_page[item["page"]], "score": 0.0}
             else:
                 # An unverified quotation stays in the record, flagged, so it can be counted and reviewed.
                 method = next((m for page, _, _, m in sap.pages if page == item["page"]), "pdf_text")
@@ -268,7 +277,7 @@ def main():
         if not components or not all(validator.is_valid(component) for component in components):
             raise ValueError("Expected schema-valid component records")
         pages = extract_pages(family["sap"], args.pdf, ocr=args.ocr)
-        settings = run_settings("llm_baseline", model=args.model, effort=args.effort, tools="none", retries=0, ocr=args.ocr)
+        settings = run_settings("llm_baseline", model=args.model, effort=args.effort, tools="none", retries=0, ocr=args.ocr, limit=args.limit)
         entries, spend, stopped = [], budget.Budget(args.model, args.max_usd, args.usd_per_mtok), False
         for entry in run_baseline(family, components, pages, rules, anthropic.Anthropic(), args.model, args.effort, args.log):
             entry["run_settings"] = settings

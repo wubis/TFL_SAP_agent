@@ -70,6 +70,11 @@ class Session:
         shell = self.shells.get(shell_id, {})
         return self.pdf is not None and shell.get("page") is not None and shell.get("family_id") in family_ids
 
+    def export_entries(self):
+        """Entries for the page's export. A proposal the reviewer was not shown is left out of it too."""
+        return [entry if self.condition(entry) == "with_proposals"
+                else {**entry, "mapping": {**entry["mapping"], "assessment": BLANK}} for entry in self.entries]
+
     def state(self):
         families = {entry["component"]["family_id"] for entry in self.entries}
         shell_ids = dict.fromkeys(entry["component"]["shell_id"] for entry in self.entries)
@@ -149,7 +154,7 @@ def handler_for(session):
                     csv_export = url.path.endswith(".csv")
                     writer = matrix_csv if csv_export else matrix_json
                     name = "traceability-matrix." + ("csv" if csv_export else "json")
-                    self.send(200, writer(session.entries, session.store.current),
+                    self.send(200, writer(session.export_entries(), session.store.current),
                               "text/csv" if csv_export else "application/json",
                               [("Content-Disposition", f'attachment; filename="{name}"')])
                 else:
@@ -217,6 +222,9 @@ def make_server(run, reviews, *, family=None, pdf=None, ocr=False, host="127.0.0
     if family is not None:
         if {entry["component"]["family_id"] for entry in entries} != {family}:
             raise ValueError("The run file does not belong to the selected family")
+        sap = select_family(manifest, family)["sap"]
+        if {(entry["mapping"]["sap_id"], entry["mapping"]["sap_version"]) for entry in entries} != {(sap["document_id"], sap["version"])}:
+            raise ValueError("The run file was made against a different SAP version than the one being searched")
         index = build_index(manifest, family, pdf, ocr)
     session = Session(entries, ReviewStore(reviews, entries), manifest, index, pdf, reviewer, conditions)
     return ThreadingHTTPServer((host, port), handler_for(session))
