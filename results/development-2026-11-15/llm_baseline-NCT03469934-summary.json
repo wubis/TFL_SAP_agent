@@ -1,0 +1,26 @@
+{
+ "model": "claude-opus-5-5",
+ "effort": "medium",
+ "components": 64,
+ "answers_rejected_by_record_rules": 1,
+ "citations": 199,
+ "citations_verified_on_cited_page": 199,
+ "citations_found_on_another_page": 0,
+ "citations_not_found": 0,
+ "citation_accuracy": 1.0,
+ "statuses": {
+  "supported": 29,
+  "partially_supported": 26,
+  "not_found_in_supplied_sap": 6,
+  "needs_review": 3
+ },
+ "token_usage": {
+  "cache_creation_input_tokens": 37607,
+  "cache_read_input_tokens": 2369241,
+  "input_tokens": 13579,
+  "output_tokens": 45041
+ },
+ "estimated_usd": 1.7298,
+ "max_usd": 2.5,
+ "components_not_run": 0
+}
