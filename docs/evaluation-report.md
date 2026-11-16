@@ -2,7 +2,7 @@
 
 [Project overview](project-overview.md) · [Build guide for evaluation](build/05-evaluation-and-release.md) · [Known limitations](limitations.md)
 
-**Status on November 15, 2026.** This draft holds the design, the scoring rules, the team's decisions on procedure, and the results that exist: keyword and hybrid retrieval and shell parsing on the three development families. No language-model system has run against the API, no person has reviewed a shell, and nothing has been run on held-out families. Sections that wait on those runs say so. Every number here was produced by a script in this repository from the original source documents.
+**Status on November 15, 2026.** This draft holds the design, the scoring rules, the team's decisions on procedure, and the results that exist: keyword and hybrid retrieval, shell parsing, and the first agent and general-purpose LLM runs on the three development families. No person has reviewed a shell, no unmatched link has been adjudicated, and nothing has been run on held-out families. Sections that wait on those runs say so. Every number here was produced by a script in this repository from the original source documents.
 
 ## 1. Question
 
@@ -57,8 +57,8 @@ Reference annotations were written and source-audited by AI annotators. ANB020-0
 | --- | --- | --- | --- |
 | Keyword search | Component label and context, the paired SAP | BM25 over 90-word SAP passages. Ranks passages. Assigns no status. | Run on development |
 | Hybrid retrieval | The same | BM25 and embedding rankings combined by reciprocal rank fusion, with a local embedding model. | Run on development with two models |
-| General-purpose LLM | One component, the whole paired SAP as text, display conventions | One model call. No tools, no quote check before the answer is accepted, no retry. | Written, not run |
-| Agent | One component, first candidates from BM25, display conventions | One model with three lookup tools and a submit tool. Code checks every quotation. At most 6 lookups and 2 submissions per component, then needs review. | Written, not run |
+| General-purpose LLM | One component, the whole paired SAP as text, display conventions | One model call. No tools, no quote check before the answer is accepted, no retry. | Run on development |
+| Agent | One component, first candidates from BM25, display conventions | One model with three lookup tools and a submit tool. Code checks every quotation. At most 6 lookups and 2 submissions per component, then needs review. | Run on development |
 | Assessor only | One component, the top candidates | One model call on retrieved candidates with a quote check and one retry. An ablation of the agent without lookups. | Written, not run |
 
 All three language-model systems use the same model at the same effort, which the team confirmed for a fair comparison. Each logs the model, full prompt, output, and token usage of every call, and every run file records its settings and a fingerprint of the code that produced it. The settings to freeze are in `benchmark/evaluation-config.draft.json`. The limits of 8 first candidates, 6 lookups, and 2 submissions were set as defaults before any model run and have not been tuned on any family.
@@ -138,11 +138,64 @@ ANB020-004, BM25 with OCR, ten candidates: 64/95 anchors and 22/49 complete comp
 
 ### 5.4 Mappings
 
-No model-backed run exists. With no judgments, every mapping is needs review: 0 links, and 5 of 64 ANB020-004 statuses agree with the reference because 5 reference statuses are needs review. That is the floor any system is measured against.
+First runs against the live API, November 15, 2026. Model `claude-opus-5-5` at medium effort served every call. The agent used its default limits. All 82 development components were run by both systems, and no component was handed off or cut by a spending cap. Quotations were checked against the SAP PDFs. Files are in `results/development-2026-11-15/`.
 
-Pending: status accuracy, link precision and recall, complete evidence, citation accuracy, and abstention for the agent, the assessor-only ablation, and the general-purpose LLM, by shell type and by challenge case.
+| Measure | Keyword search (BM25, 10 candidates) | General-purpose LLM | Agent |
+| --- | --- | --- | --- |
+| Status correct | not applicable | 51/82 (62%) | 50/82 (61%) |
+| Reference anchors found | 84/120 (70%) | 94/120 (78%) | 100/120 (83%) |
+| Components with every evidence group covered | 36/66 (55%) | 50/66 (76%) | 52/66 (79%) |
+| Proposed links matched to a reference anchor | not applicable | 114/267 (43%) | 121/304 (40%) |
+| Links on components whose reference has no evidence | not applicable | 38 | 53 |
+| Correct abstention (reference not found) | not applicable | 5/16 (31%) | 2/16 (12%) |
+| Quotations verified against the SAP | not applicable | 249/267 (93%) | 304/304 (100%) |
 
-Before any of those runs, `benchmark/live_check.py` makes a few real calls on development components and checks that the commands finish, that the requested model served every call, that every cited quotation is in the passage it cites, and that prompts and token usage were logged. It has not been run, because no API key is available yet. Tests with a stand-in client cannot show that live calls and real model responses behave as intended.
+| Status correct by shell type | General-purpose LLM | Agent |
+| --- | --- | --- |
+| Table | 38/57 (67%) | 38/57 (67%) |
+| Listing | 9/17 (53%) | 8/17 (47%) |
+| Figure | 4/8 (50%) | 4/8 (50%) |
+
+By tagged challenge case, status correct for the agent and the LLM: evidence across multiple sections 17/25 and 16/25, incomplete specification 17/23 and 18/23. The unsupported footnote and the convention-only component, one record each, were answered correctly by both.
+
+What these first runs show:
+
+- Both language-model systems find more of the required evidence than keyword search. The agent finds the most, and every quotation it cites is verbatim, because code checks each one before the answer is accepted.
+- On status, the agent and the general-purpose LLM are level. The agent is not better than the baseline on development data.
+- Both abstain too rarely. Of the 16 components whose reference is not found, the agent called 14 partially supported. In the cases read, it reached the right finding, for example that the SAP gives no 95% CI for that row, and still chose partially supported because the surrounding context (population, endpoint) has support. It treats support for a component's context as partial support for the component's own claim.
+- Neither system ever answered needs review for the 8 components whose reference is needs review.
+- Fewer than half the proposed links match a reference anchor at passage level. These are not yet unsupported links: they need the blind adjudication in section 6a. Many are context passages cited alongside the passage that carries the claim.
+- TARVA is the weakest family for both systems (status 2/7 each). Its SAP is a two-column journal article, and the page text extracted from it interleaves the columns. The agent found 6 of 11 anchors there. All 18 of the baseline's unverified quotations are on TARVA: the model reassembled sentences from the interleaved text, so they are not contiguous in the extracted page. This is a document-processing limit, and the held-out TAPS-2 SAP has the same layout.
+
+The assessor-only ablation has not been run. Estimated API spend for the live check and these runs is about $9.20, using list prices and counting cache writes at twice the input rate, so the real figure is lower.
+
+### 5.5 One instruction change, checked on 32 components
+
+After those runs the instructions of every system were changed once, with the same wording for each: judge the component's own claim, treat support for the context alone as no support, cite only passages that establish the claim, and send conflicting passages or readings to needs review. The change was made on development data, which is what development data is for.
+
+It was checked on 32 ANB020-004 components: all 15 whose reference is not found, all 5 whose reference is needs review, and 6 supported and 6 partially supported controls drawn at random with a fixed seed. Both systems were rerun on those 32. Files are in `results/development-2026-11-15/instruction-check/`.
+
+| On the same 32 components | Agent before | Agent after | LLM before | LLM after |
+| --- | --- | --- | --- | --- |
+| Status correct | 13 | 17 | 16 | 22 |
+| Reference not found, answered not found | 2/15 | 8/15 | 5/15 | 13/15 |
+| Reference needs review, answered needs review | 0/5 | 0/5 | 0/5 | 0/5 |
+| Supported controls still correct | 6/6 | 6/6 | 5/6 | 6/6 |
+| Partially supported controls still correct | 5/6 | 3/6 | 6/6 | 3/6 |
+| Proposed links | 115 | 57 | 97 | 49 |
+| Links matched to a reference anchor | 34 | 28 | 31 | 25 |
+| Links on components whose reference has no evidence | 49 | 16 | 34 | 5 |
+| Reference anchors found | 31/40 | 29/40 | 28/40 | 27/40 |
+
+The change is kept. It raised status accuracy for both systems, halved the number of links, and cut links on components with no reference evidence by two thirds or more, at a cost of one or two anchors and of some partially supported controls now answered supported.
+
+Three things stand out, and none was tuned further:
+
+- The general-purpose LLM gained more than the agent and is ahead of it on status in this check (22 against 17). With the whole SAP in view it is more willing to conclude that nothing supports a claim.
+- Several of the agent's remaining misses on not-found components are answers of needs review. For a row such as a 95% CI in a descriptive summary, the SAP's general rule for descriptive statistics leaves the CI out. The reference calls that not found. The agent calls it a conflict between the shell and the SAP. The annotation guide does not yet say which is right, and the team should decide before sign-off.
+- Neither system identified the five needs-review references. Four of them are treatment header and legend labels whose rule sits in a scanned appendix.
+
+This check ran 32 components once per system. It shows direction, not a precise effect. Estimated spend for it was $3.38, bringing the running estimate to about $12.60.
 
 ## 6. Reviewer effort
 

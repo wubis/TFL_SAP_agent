@@ -1,0 +1,62 @@
+{
+ "agent before": {
+  "status_correct": 13,
+  "by_reference_status": {
+   "not_found_in_supplied_sap": "2/15",
+   "needs_review": "0/5",
+   "supported": "6/6",
+   "partially_supported": "5/6"
+  },
+  "links": 115,
+  "matched": 34,
+  "unverified": 0,
+  "anchors": "31/40",
+  "complete": "11/17",
+  "links_where_ref_has_none": 49
+ },
+ "agent after": {
+  "status_correct": 17,
+  "by_reference_status": {
+   "not_found_in_supplied_sap": "8/15",
+   "needs_review": "0/5",
+   "supported": "6/6",
+   "partially_supported": "3/6"
+  },
+  "links": 57,
+  "matched": 28,
+  "unverified": 0,
+  "anchors": "29/40",
+  "complete": "10/17",
+  "links_where_ref_has_none": 16
+ },
+ "LLM before": {
+  "status_correct": 16,
+  "by_reference_status": {
+   "not_found_in_supplied_sap": "5/15",
+   "needs_review": "0/5",
+   "supported": "5/6",
+   "partially_supported": "6/6"
+  },
+  "links": 97,
+  "matched": 31,
+  "unverified": 0,
+  "anchors": "28/40",
+  "complete": "11/17",
+  "links_where_ref_has_none": 34
+ },
+ "LLM after": {
+  "status_correct": 22,
+  "by_reference_status": {
+   "not_found_in_supplied_sap": "13/15",
+   "needs_review": "0/5",
+   "supported": "6/6",
+   "partially_supported": "3/6"
+  },
+  "links": 49,
+  "matched": 25,
+  "unverified": 0,
+  "anchors": "27/40",
+  "complete": "10/17",
+  "links_where_ref_has_none": 5
+ }
+}

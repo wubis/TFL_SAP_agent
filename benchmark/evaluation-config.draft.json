@@ -4,6 +4,7 @@
     "same_model_and_effort_for_all_systems": "Confirmed by the team on 2026-11-15 for a fair comparison.",
     "limits": "8 first candidates, 6 lookups, and 2 submissions were set as defaults before any model run. They have not been tuned on any family. If they are tuned, use development families only.",
     "retrieval": "BM25. Hybrid retrieval with BAAI/bge-small-en-v1.5 and with MedCPT did not beat BM25 at 5 or 10 candidates on development families.",
+    "instructions": "Changed once on 2026-11-15 after the first development runs, the same wording for every system: judge the component's own claim, not its context. Checked on 32 ANB020-004 components and kept. Not tuned further.",
     "not_found_rule": "A system may answer not_found_in_supplied_sap after a documented search, and the record lists the searches.",
     "spending_cap": "Set with --max-usd when the API key arrives.",
     "freeze": "Run benchmark/freeze_config.py, commit the frozen file alone, and tag that commit. One person runs the held-out evaluation once."

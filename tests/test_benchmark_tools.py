@@ -98,3 +98,4 @@ def test_live_check_reads_real_command_output(tmp_path):
     assert all(baseline_checks.values()) and any("1 cited, 1 verified" in label for label in baseline_checks)
     wrong_model = dict(live.checks_for_run("agent", tmp_path / "agent-run.jsonl", agent_log, 1, "claude-sonnet-5-5"))
     assert [label for label, passed in wrong_model.items() if not passed] == ["agent: requested model served every call (['claude-opus-5-5'])"]
+    assert agent_checks["agent: lookup tools used 1 time(s) across these components"] is True

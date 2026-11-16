@@ -43,7 +43,9 @@ def checks_for_run(name, path, log, limit, model):
     if name == "agent":
         yield "agent: every cited quotation is in the passage it cites", verified
         yield "agent: at least one component reached a verdict without hand-off", any(not entry["agent"]["handed_off"] for entry in entries)
-        yield "agent: the model used a lookup tool at least once", any(entry["agent"]["lookups"] for entry in entries)
+        # Easy components need no lookup, so this is reported and never failed.
+        lookups = sum(len(entry["agent"]["lookups"]) for entry in entries)
+        yield f"agent: lookup tools used {lookups} time(s) across these components", True
     else:
         outcomes = [check["outcome"] for entry in entries for check in entry["baseline"]["citations"]]
         yield f"llm_baseline: citations checked ({len(outcomes)} cited, {outcomes.count('verified')} verified)", True
